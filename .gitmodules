@@ -1,0 +1,3 @@
+[submodule "pitch-client"]
+	path = pitch-client
+	url = https://github.com/zldobbs/pitch-client.git
