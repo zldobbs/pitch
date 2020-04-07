@@ -14,10 +14,16 @@ app.use(bodyParser.json());
 
 app.io = io;
 
+// Route definitions
+const LoginRoute = require('./routes/api/login'); 
+const RegisterRoute = require('./routes/api/register');
+app.use('/api/login', LoginRoute); 
+app.use('/api/register', RegisterRoute);
+
 // database
 const db = require('./model/database');
 
 const port = process.env.PORT || "8000";
 server.listen(port, () => {
-    console.log(`Listening to requests on http://localhost:${port}`);
+  console.log(`Listening to requests on http://localhost:${port}`);
 });
