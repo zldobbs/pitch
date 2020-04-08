@@ -6,7 +6,7 @@
 const mongoose = require('mongoose');
 
 const UserSchema = mongoose.Schema({
-    username: {type: String, unique: true},
+    username: { type: String, unique: true },
     passHash: String,
     salt: String,
     games: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Game' }],

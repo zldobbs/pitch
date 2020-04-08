@@ -3,21 +3,21 @@ const express = require('express');
 const mongoose = require('mongoose');
 const router = express.Router();
 
-const User = require('./../../model/User.js');
+const User = require('./../../model/User');
 const Utils = require('./../../utility.js');
 
 router.post('/', async (req, res) => {
-  username = req.body['username'].toLowerCase();
-  password = req.body['password'];
-  confirmPassword = req.body['confirmPassword'];
-
-  if (username == undefined || password == undefined) {
+  if (req.body['username'] == undefined ||  req.body['password'] == undefined) {
     res.json({
       "status": "error",
       "details": "Missing required fields."
     });
     return;
   }
+
+  const username = req.body['username'].toLowerCase();
+  const password = req.body['password'];
+  const confirmPassword = req.body['confirmPassword'];
 
   if (password != confirmPassword) {
     res.json({
@@ -27,7 +27,7 @@ router.post('/', async (req, res) => {
     return;
   }
 
-  const user = await User.findOne({ username: username }).exec();
+  const user = await User.findOne({ username: username });
   if (user) {
     res.json({
       "status": "error",
@@ -36,13 +36,13 @@ router.post('/', async (req, res) => {
     return;
   }
 
-  let salt = Utils.generateSalt()
+  let salt = Utils.generateSalt();
 
   let newUser = new User({
     username: username,
     passHash: Utils.hashPassword(password, salt),
     salt: salt
-  })
+  });
   newUser.save().then(item => {
     res.json({"status": "success"});
   }).catch(err => {
