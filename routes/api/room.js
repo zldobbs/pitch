@@ -82,17 +82,14 @@ router.post('/', async (req, res) => {
 
 router.get('/staging/:roomId', async (req, res) => {
   roomId = req.params['roomId'].toUpperCase();
-  console.log(roomId);
   let room = await getRoom(roomId);
   if (room == undefined) {
-    console.log('room undefined');
     res.json({
       "status": "error",
       "details": "Unable to find requested room"
     });
   }
   else {
-    console.log(room);
     res.json({
       "status": "success",
       "room": room 
