@@ -11,7 +11,10 @@ const RoomSchema = mongoose.Schema({
     messages: [{
         user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
         message: String
-    }]
+    }],
+    team1: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
+    team2: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
+    isActive: Boolean
 });
 
 const Room = module.exports = mongoose.model('Room', RoomSchema);

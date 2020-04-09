@@ -1,3 +1,4 @@
+/* functions for register route */
 
 const express = require('express');
 const mongoose = require('mongoose');

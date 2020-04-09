@@ -1,11 +1,12 @@
-/* routes for login functions */
+/* routes for room functions */
 
 const express = require('express');
 const router = express.Router();
 const shortid = require('shortid');
 
-const User = require('../../model/User');
 const Room = require('../../model/Room');
+const Team = require('../../model/Team');
+const User = require('../../model/User');
 const Utils = require('../../utility.js');
 const auth = require('../../auth.json'); 
 
@@ -13,45 +14,11 @@ async function getRoom(roomId) {
   return await Room.findOne({ short_id: roomId.toUpperCase() }).exec();
 }
 
-router.post('/', async (req, res) => {
-  // TODO We actually don't care about a user until the game itself has been started...
-  // let user; 
-  // if (req.body['username'] != undefined) {
-  //   user = await (await User.findOne({ username: req.body['username'].toLowerCase() })).execPopulate();
-  //   if (user == undefined) {
-  //     console.log(`Unable to find user: ${req.body['username']}`);
-  //     res.json({
-  //       "status": "error",
-  //       "details": `Unable to find user: ${req.body['username']}`
-  //     });
-  //   }
-  // }
-  // else {
-  //   // No user provided, assign to default user
-  //   user = await (await User.findOne({ username: auth.defaultUser.username })).execPopulate();
-  //   // If user was not found the database has not created it yet
-  //   if (user == undefined) {
-  //     let salt = Utils.generateSalt();
-  //     let defaultUser = new User({
-  //       username: auth.defaultUser.username,
-  //       passHash: Utils.hashPassword(auth.defaultUser.password, salt),
-  //       salt: salt
-  //     });
-  //     defaultUser.save().then(item => {
-  //       user = item; 
-  //     }).catch(err => {
-  //       console.log('\nDatabase ERROR - ' + new Date(Date.now()).toLocaleString())
-  //       console.log(err)
-  //       res.json({
-  //         "status": "error",
-  //         "details": "There was an error saving the default user to the database."
-  //       });
-  //     });
-  //   }
-  // }
-  // At this point we have a user (may be default) and may begin creating a room 
-  // Keep in mind that if the req.body['username'] is undefined we know it was requested by anon
+async function getRoomPopulated(roomId) {
+  return await Room.findOne({ short_id: roomId.toUpperCase() }).populate('team1').populate('team2');
+}
 
+router.post('/', async (req, res) => {
   // Generate a room id, will be different than the mongo id
   // Useful for sharing with friends
   shortid.characters('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ@$');
@@ -61,10 +28,35 @@ router.post('/', async (req, res) => {
     console.log("Generating another id...");
     short_id = shortid.generate();
   }
+
+  // Create two new teams for the new room 
+  let newTeams = [];
+  for (let teamNum = 0; teamNum < 2; teamNum++) {
+    newTeams.push(new Team({
+      name: `Team ${teamNum+1}`, 
+      score: 0,
+      player1: null,
+      player1DisplayName: '',
+      player2: null,
+      player2DisplayName: ''
+    }));
+    newTeams[teamNum].save().catch(err => {
+      console.log(err);
+      res.json({
+        "status": "error",
+        "details": "There was an error saving a team to the database."
+      });
+    });
+  }
+
+  // Create the new room
   let newRoom = new Room({ 
     short_id: short_id.toUpperCase(),
     games: [],
-    messages: []
+    messages: [],
+    team1: newTeams[0],
+    team2: newTeams[1],
+    isActive: false
   });
   newRoom.save().then(item => {
     res.json({
@@ -81,8 +73,8 @@ router.post('/', async (req, res) => {
 });
 
 router.get('/staging/:roomId', async (req, res) => {
-  roomId = req.params['roomId'].toUpperCase();
-  let room = await getRoom(roomId);
+  const roomId = req.params['roomId'].toUpperCase();
+  let room = await getRoomPopulated(roomId);
   if (room == undefined) {
     res.json({
       "status": "error",

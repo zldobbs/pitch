@@ -17,7 +17,6 @@ router.post('/', async (req, res) => {
 
   const username = req.body['username'].toLowerCase();
   const password = req.body['password'];
-
   const user = await User.findOne({ username: username }).exec();
   if (!user) {
     res.json({
