@@ -37,8 +37,10 @@ router.post('/', async (req, res) => {
       score: 0,
       player1: null,
       player1DisplayName: '',
+      player1Ready: false, 
       player2: null,
-      player2DisplayName: ''
+      player2DisplayName: '',
+      player2Ready: false 
     }));
     newTeams[teamNum].save().catch(err => {
       console.log(err);

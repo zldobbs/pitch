@@ -152,13 +152,15 @@ router.post('/leave', async (req, res) => {
   if (req.body['playerNum'] == 'player1') {
     query = {$set: { 
       player1: null,
-      player1DisplayName: '' 
+      player1DisplayName: '',
+      player1Ready: false 
     }};
   }
   else {
     query = {$set: { 
       player2: null,
-      player2DisplayName: '' 
+      player2DisplayName: '',
+      player2Ready: false  
     }};
   }
 
@@ -185,6 +187,76 @@ router.post('/leave', async (req, res) => {
   res.json({
     "status": "success",
     "details": "Removed player" 
+  });
+});
+
+router.post('/ready', async (req, res) => {
+  const teamId = req.body['teamId']; 
+  let team = await getTeamPopulated(teamId);
+  if (team == undefined) {
+    res.json({
+      "status": "error",
+      "details": "Unable to find requested team"
+    });
+    return; 
+  }
+
+  const player = req.body['playerNum'];
+  let readyStatus; 
+  if (player == 'player1' && team.player1 != null) {
+    readyStatus = (team.player1Ready ? false : true);
+    
+  }
+  else if (player == 'player2' && team.player2 != null) {
+    readyStatus = (team.player2Ready ? false : true);
+  }
+  else {
+    res.json({
+      "status": "error",
+      "details": "Player information is invalid"
+    });
+    return; 
+  }
+
+  let query;
+  if (player == 'player1') {
+    query = {$set: { 
+      player1Ready: readyStatus 
+    }};
+  }
+  else {
+    query = {$set: { 
+      player2Ready: readyStatus  
+    }};
+  }
+
+  await Team.updateOne(
+    { _id: team._id }, 
+    query,
+    (err, updatedTeamDoc) => {
+      if (err) {
+        console.log(err); 
+        res.json({
+          "status": "error",
+          "details": "Could not update player"
+        });
+        return; 
+      }
+    }
+  );
+
+  // Get the updatedTeam
+  const updatedRoom = await Room.findOne({ $or: [{ team1: req.body['teamId']}, { team2: req.body['teamId']}] }).populate('team1').populate('team2');
+  req.app.io.to(updatedRoom.short_id).emit('team-change', updatedRoom.team1, updatedRoom.team2);
+
+  // TODO Check if all players are ready... 
+  if (updatedRoom.team1.player1Ready && updatedRoom.team1.player2Ready 
+    && updatedRoom.team2.player1Ready && updatedRoom.team2.player2Ready) {
+    // Start the room 
+  }
+
+  res.json({
+    "status": "success"
   });
 });
 
