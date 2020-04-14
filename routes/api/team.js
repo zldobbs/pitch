@@ -4,6 +4,8 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../../auth.json');
 
+const RoomAPI = require('./room'); 
+
 const Room = require('../../model/Room');
 const Team = require('../../model/Team');
 const User = require('../../model/User');
@@ -253,11 +255,10 @@ router.post('/ready', async (req, res) => {
   if (updatedRoom.team1.player1Ready && updatedRoom.team1.player2Ready 
     && updatedRoom.team2.player1Ready && updatedRoom.team2.player2Ready) {
     // Start the room 
+    let room = await RoomAPI.startRoom(updatedRoom.short_id);
+    req.app.io.to(room.short_id).emit('room-ready', room.short_id);
+    res.json({ "status": "success" });
   }
-
-  res.json({
-    "status": "success"
-  });
 });
 
 module.exports = router;

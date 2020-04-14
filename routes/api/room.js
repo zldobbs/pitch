@@ -4,6 +4,8 @@ const express = require('express');
 const router = express.Router();
 const shortid = require('shortid');
 
+const GameAPI = require('./game');
+
 const Room = require('../../model/Room');
 const Team = require('../../model/Team');
 const User = require('../../model/User');
@@ -16,6 +18,19 @@ async function getRoom(roomId) {
 
 async function getRoomPopulated(roomId) {
   return await Room.findOne({ short_id: roomId.toUpperCase() }).populate('team1').populate('team2');
+}
+
+async function startRoom(roomId) {
+  let room = await getRoomPopulated(roomId); 
+  if (room == undefined) {
+    return undefined; 
+  }
+
+  // Create a new game 
+  let game = await GameAPI.createNewGame();
+  room.isActive = true; 
+  room.games.push(game._id);
+  return room.save();
 }
 
 router.post('/', async (req, res) => {
@@ -74,7 +89,7 @@ router.post('/', async (req, res) => {
   });
 });
 
-router.get('/staging/:roomId', async (req, res) => {
+router.get('/:roomId', async (req, res) => {
   const roomId = req.params['roomId'].toUpperCase();
   let room = await getRoomPopulated(roomId);
   if (room == undefined) {
@@ -92,3 +107,5 @@ router.get('/staging/:roomId', async (req, res) => {
 });
 
 module.exports = router;
+
+module.exports.startRoom = startRoom;

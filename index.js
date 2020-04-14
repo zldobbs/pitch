@@ -15,10 +15,12 @@ app.use(bodyParser.json());
 app.io = io;
 
 // Route definitions
+const GameRoute = require('./routes/api/game'); 
 const LoginRoute = require('./routes/api/login'); 
 const RegisterRoute = require('./routes/api/register');
 const RoomRoute = require('./routes/api/room');
 const TeamRoute = require('./routes/api/team');
+app.use('/api/game', GameRoute); 
 app.use('/api/login', LoginRoute); 
 app.use('/api/register', RegisterRoute);
 app.use('/api/room', RoomRoute);

@@ -6,7 +6,13 @@
 const mongoose = require('mongoose');
 
 const GameSchema = mongoose.Schema({
-    room_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Room' },
+    deck: [Number],
+    t1p1: [Number],
+    t1p2: [Number],
+    t2p1: [Number],
+    t2p2: [Number], 
+    team1Score: Number,
+    team2Score: Number,
     isActive: Boolean
 });
 
