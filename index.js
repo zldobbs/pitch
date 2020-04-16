@@ -37,13 +37,11 @@ server.listen(port, () => {
 
 // socket.io setup
 io.on('connection', (socket) => {
-    console.log("New user connected");
-
     // Joins the given socket to the given room
     socket.on('join-room', (room) => {
         console.log('User joining room: ' + room);
         socket.join(room);
         // To check whos in the room: 
-        console.log(io.sockets.adapter.rooms[room]);
+        // console.log(io.sockets.adapter.rooms[room]);
     });
 });

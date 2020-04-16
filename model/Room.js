@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 
 const RoomSchema = mongoose.Schema({
     short_id: { type: String, unique: true },
+    activeGame: { type: mongoose.Schema.Types.ObjectId, ref: 'Game' },
     games: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Game' }],
     messages: [{
         user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -14,7 +15,6 @@ const RoomSchema = mongoose.Schema({
     }],
     team1: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
     team2: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
-    isActive: Boolean
 });
 
 const Room = module.exports = mongoose.model('Room', RoomSchema);

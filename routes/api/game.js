@@ -16,6 +16,7 @@ const express = require('express');
 const router = express.Router();
 
 const Game = require('../../model/Game');
+const Room = require('../../model/Room');
 
 function shuffleDeck() {
   // Initializes an array of 54 integers [1,2,..54]
@@ -52,6 +53,43 @@ async function createNewGame() {
 
   return newGame.save();
 }
+
+router.post('/hand', async (req, res) => {
+  // Get the room
+  const room = await Room.findOne({ $or: [{ team1: req.body['teamId'] }, { team2: req.body['teamId']}] }).populate('activeGame');
+
+  if (!room) {
+    res.json({
+      "status": "error",
+      "details": "Failed to find the room"
+    });
+    return; 
+  }
+  console.log('room retrieved to get active game');
+  console.log(room); 
+  let hand; 
+  if (req.body['teamId'] == room.team1) {
+    // user is on team 1 
+    hand = (req.body['playerNum'] == 'player1' ? room.activeGame.t1p1 : room.activeGame.t1p2); 
+  }
+  else {
+    // user is on team 2
+    hand = (req.body['playerNum'] == 'player1' ? room.activeGame.t2p1 : room.activeGame.t2p2); 
+  }
+
+  if (!hand) {
+    res.json({
+      "status": "error",
+      "details": "Failed to find the room"
+    });
+    return; 
+  }
+
+  res.json({
+    "status": "success", 
+    "hand": hand 
+  });
+});
 
 module.exports = router;
 

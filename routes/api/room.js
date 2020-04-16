@@ -28,7 +28,7 @@ async function startRoom(roomId) {
 
   // Create a new game 
   let game = await GameAPI.createNewGame();
-  room.isActive = true; 
+  room.activeGame = game._id; 
   room.games.push(game._id);
   return room.save();
 }
