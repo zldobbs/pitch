@@ -17,7 +17,9 @@ async function getRoom(roomId) {
 }
 
 async function getRoomPopulated(roomId) {
-  return await Room.findOne({ short_id: roomId.toUpperCase() }).populate('team1').populate('team2');
+  return await Room.findOne({ short_id: roomId.toUpperCase() })
+    .populate({ path: 'team1', populate: [{ path: 'player1', select: 'displayName isReady cardCount' }, { path: 'player2', select: 'displayName isReady cardCount' }]})
+    .populate({ path: 'team2', populate: [{ path: 'player1' }, { path: 'player2' }]});
 }
 
 async function startRoom(roomId) {
@@ -27,7 +29,7 @@ async function startRoom(roomId) {
   }
 
   // Create a new game 
-  let game = await GameAPI.createNewGame();
+  let game = await GameAPI.createNewGame(room);
   room.activeGame = game._id; 
   room.games.push(game._id);
   return room.save();
@@ -51,11 +53,7 @@ router.post('/', async (req, res) => {
       name: `Team ${teamNum+1}`, 
       score: 0,
       player1: null,
-      player1DisplayName: '',
-      player1Ready: false, 
       player2: null,
-      player2DisplayName: '',
-      player2Ready: false 
     }));
     newTeams[teamNum].save().catch(err => {
       console.log(err);

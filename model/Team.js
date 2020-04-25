@@ -8,12 +8,8 @@ const mongoose = require('mongoose');
 const TeamSchema = mongoose.Schema({
     name: String, 
     score: Number,
-    player1: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    player1DisplayName: String,
-    player1Ready: Boolean, 
-    player2: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    player2DisplayName: String,
-    player2Ready: Boolean
+    player1: { type: mongoose.Schema.Types.ObjectId, ref: 'Player' },
+    player2: { type: mongoose.Schema.Types.ObjectId, ref: 'Player' },
 });
 
-const User = module.exports = mongoose.model('Team', TeamSchema);
+const Team = module.exports = mongoose.model('Team', TeamSchema);

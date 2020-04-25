@@ -17,6 +17,7 @@ const router = express.Router();
 
 const Game = require('../../model/Game');
 const Room = require('../../model/Room');
+const Player = require('../../model/Player'); 
 
 function shuffleDeck() {
   // Initializes an array of 54 integers [1,2,..54]
@@ -32,20 +33,25 @@ function shuffleDeck() {
   return deck; 
 }
 
-async function createNewGame() {
+async function setPlayerHand(playerId, hand) {
+  let player = await Player.getPlayerWithCards(playerId); 
+
+  player.hand = hand; 
+  await player.save();
+  return; 
+}
+
+async function createNewGame(room) {
   let deck = shuffleDeck(); 
+  
   // Give 9 cards to each player, denotes their hands 
-  let t1p1 = deck.splice(0, 9); 
-  let t1p2 = deck.splice(0, 9); 
-  let t2p1 = deck.splice(0, 9);
-  let t2p2 = deck.splice(0, 9); 
+  setPlayerHand(room.team1.player1._id, deck.splice(0,9));
+  setPlayerHand(room.team1.player2._id, deck.splice(0,9));
+  setPlayerHand(room.team2.player1._id, deck.splice(0,9));
+  setPlayerHand(room.team2.player2._id, deck.splice(0,9));
 
   let newGame = new Game({
     deck: deck,
-    t1p1: t1p1, 
-    t1p2: t1p2,
-    t2p1: t2p1, 
-    t2p2: t2p2, 
     team1Score: 0, 
     team2Score: 0,
     isActive: true

@@ -14,14 +14,23 @@ app.use(bodyParser.json());
 
 app.io = io;
 
+// Models 
+const Game = require('./model/Game');
+const Player = require('./model/Player');
+const Room = require('./model/Room');
+const Team = require('./model/Team');
+const User = require('./model/User');
+
 // Route definitions
 const GameRoute = require('./routes/api/game'); 
 const LoginRoute = require('./routes/api/login'); 
+const PlayerRoute = require('./routes/api/player');
 const RegisterRoute = require('./routes/api/register');
 const RoomRoute = require('./routes/api/room');
 const TeamRoute = require('./routes/api/team');
 app.use('/api/game', GameRoute); 
 app.use('/api/login', LoginRoute); 
+app.use('/api/player', PlayerRoute); 
 app.use('/api/register', RegisterRoute);
 app.use('/api/room', RoomRoute);
 app.use('/api/team', TeamRoute);
