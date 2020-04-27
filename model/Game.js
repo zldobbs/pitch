@@ -7,7 +7,10 @@ const mongoose = require('mongoose');
 
 const GameSchema = mongoose.Schema({
     deck: [Number], 
-    suit: String, 
+    bid: Number,
+    biddingTeam: Number, 
+    suit: Number, 
+    activePlayer: { type: mongoose.Schema.Types.ObjectId, ref: 'Player' },
     team1Score: Number,
     team2Score: Number,
     isActive: Boolean

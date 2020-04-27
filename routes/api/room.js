@@ -19,7 +19,7 @@ async function getRoom(roomId) {
 async function getRoomPopulated(roomId) {
   return await Room.findOne({ short_id: roomId.toUpperCase() })
     .populate({ path: 'team1', populate: [{ path: 'player1', select: 'displayName isReady cardCount' }, { path: 'player2', select: 'displayName isReady cardCount' }]})
-    .populate({ path: 'team2', populate: [{ path: 'player1' }, { path: 'player2' }]});
+    .populate({ path: 'team2', populate: [{ path: 'player1' }, { path: 'player2' }]}).populate('activeGame');
 }
 
 async function startRoom(roomId) {
@@ -67,6 +67,7 @@ router.post('/', async (req, res) => {
   // Create the new room
   let newRoom = new Room({ 
     short_id: short_id.toUpperCase(),
+    lastDealer: -1,
     games: [],
     messages: [],
     team1: newTeams[0],

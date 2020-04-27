@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 
 const RoomSchema = mongoose.Schema({
     short_id: { type: String, unique: true },
+    lastDealer: Number,
     activeGame: { type: mongoose.Schema.Types.ObjectId, ref: 'Game' },
     games: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Game' }],
     messages: [{

@@ -36,7 +36,8 @@ function shuffleDeck() {
 async function setPlayerHand(playerId, hand) {
   let player = await Player.getPlayerWithCards(playerId); 
 
-  player.hand = hand; 
+  player.hand = hand.sort((a, b) => a - b); 
+  player.cardCount = hand.length; 
   await player.save();
   return; 
 }
@@ -50,8 +51,40 @@ async function createNewGame(room) {
   setPlayerHand(room.team2.player1._id, deck.splice(0,9));
   setPlayerHand(room.team2.player2._id, deck.splice(0,9));
 
+  if (room.lastDealer < 1 || room.lastDealer > 4) {
+    room.lastDealer = Math.floor(Math.random() * 4) + 1; 
+  }
+
+  let newDealer;
+  switch(room.lastDealer) {
+    case 1: {
+      newDealer = room.team1.player1._id; 
+      break; 
+    }
+    case 2: {
+      newDealer = room.team2.player1._id;
+      break;
+    }
+    case 3: {
+      newDealer = room.team1.player2._id; 
+      break; 
+    }
+    case 4: {
+      newDealer = room.team2.player2._id; 
+      break;
+    }
+    default: {
+      console.log("Error: Room's last dealer is invalid: " + room.lastDealer); 
+      return null; 
+    }
+  }
+
   let newGame = new Game({
     deck: deck,
+    bid: 0,
+    biddingTeam: 0,
+    suit: -1,
+    activePlayer: newDealer,
     team1Score: 0, 
     team2Score: 0,
     isActive: true
