@@ -50,6 +50,8 @@ router.post('/ready', async (req, res) => {
     && updatedRoom.team2.player1.isReady && updatedRoom.team2.player2.isReady)) {
     // Start the room 
     let room = await RoomAPI.startRoom(updatedRoom.short_id);
+
+    // Emit notification that the room is ready for gameplay
     req.app.io.to(room.short_id).emit('room-ready', room.short_id);
   }
 

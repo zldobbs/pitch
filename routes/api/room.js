@@ -8,6 +8,7 @@ const GameAPI = require('./game');
 
 const Room = require('../../model/Room');
 const Team = require('../../model/Team');
+const Player = require('../../model/Player');
 const User = require('../../model/User');
 const Utils = require('../../utility.js');
 const auth = require('../../auth.json'); 
@@ -19,7 +20,7 @@ async function getRoom(roomId) {
 async function getRoomPopulated(roomId) {
   return await Room.findOne({ short_id: roomId.toUpperCase() })
     .populate({ path: 'team1', populate: [{ path: 'player1', select: 'displayName isReady cardCount' }, { path: 'player2', select: 'displayName isReady cardCount' }]})
-    .populate({ path: 'team2', populate: [{ path: 'player1' }, { path: 'player2' }]}).populate('activeGame');
+    .populate({ path: 'team2', populate: [{ path: 'player1' }, { path: 'player2' }]}).populate({ path: 'activeGame', populate: { path: 'activePlayer', select: 'displayName isReady cardCount' }});
 }
 
 async function startRoom(roomId) {
@@ -32,6 +33,9 @@ async function startRoom(roomId) {
   let game = await GameAPI.createNewGame(room);
   room.activeGame = game._id; 
   room.games.push(game._id);
+
+  let activePlayer = await Player.getPlayerNoCards(game.activePlayer);
+  room.roomStatus = `New game has begun! ${activePlayer.displayName} starts the bidding.`;
   return room.save();
 }
 
@@ -67,12 +71,13 @@ router.post('/', async (req, res) => {
   // Create the new room
   let newRoom = new Room({ 
     short_id: short_id.toUpperCase(),
+    roomStatus: 'New room created',
     lastDealer: -1,
     games: [],
     messages: [],
     team1: newTeams[0],
     team2: newTeams[1],
-    isActive: false
+    activeGame: null
   });
   newRoom.save().then(item => {
     res.json({
@@ -91,6 +96,7 @@ router.post('/', async (req, res) => {
 router.get('/:roomId', async (req, res) => {
   const roomId = req.params['roomId'].toUpperCase();
   let room = await getRoomPopulated(roomId);
+  console.log(room);
   if (room == undefined) {
     res.json({
       "status": "error",

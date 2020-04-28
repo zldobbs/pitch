@@ -22,6 +22,10 @@ module.exports.getPlayerWithCards = async (playerId) => {
   return Player.findOne({ _id: playerId }).populate('user');
 }
 
+module.exports.getPlayerNoCards = async (playerId) => {
+  return Player.findOne({ _id: playerId }).select('displayName cardCount isReady');
+}
+
 module.exports.createPlayer = async (user) => {
   let displayName; 
   if (!user) {
