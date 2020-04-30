@@ -51,6 +51,6 @@ io.on('connection', (socket) => {
         console.log('User joining room: ' + room);
         socket.join(room);
         // To check whos in the room: 
-        // console.log(io.sockets.adapter.rooms[room]);
+        console.log(io.sockets.adapter.rooms[room]);
     });
 });

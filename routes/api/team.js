@@ -32,7 +32,6 @@ async function removePlayerFromTeam(playerId) {
       { _id: team._id }, 
       query,
       (err, updatedTeamDoc) => {
-        console.log(updatedTeamDoc);
         if (err) {
           console.log(err); 
           return null; 

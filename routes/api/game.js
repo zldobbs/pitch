@@ -19,6 +19,44 @@ const Game = require('../../model/Game');
 const Room = require('../../model/Room');
 const Player = require('../../model/Player'); 
 
+async function getRoomByActivePlayer(playerId) {
+  // Given a player Id, find the game that player is the active player of (if one exists)
+  let game = await Game.findOne({ activePlayer: playerId }).populate('activePlayer');
+  if (!game) {
+    return null;
+  }
+
+  return await Room.findOne({ activeGame: game._id }).populate({ path: 'team1', populate: [{ path: 'player1', select: 'displayName isReady cardCount' }, { path: 'player2', select: 'displayName isReady cardCount' }]})
+  .populate({ path: 'team2', populate: [{ path: 'player1' }, { path: 'player2' }]}).populate({ path: 'activeGame', populate: { path: 'activePlayer', select: 'displayName isReady cardCount' }});
+}
+
+function getNextPlayer(room) {
+  let nextPlayer;
+  switch(room.activeGame.activePlayerIndex) {
+    case 0: {
+      nextPlayer = room.team1.player1; 
+      break; 
+    }
+    case 1: {
+      nextPlayer = room.team2.player1;
+      break;
+    }
+    case 2: {
+      nextPlayer = room.team1.player2; 
+      break; 
+    }
+    case 3: {
+      nextPlayer = room.team2.player2; 
+      break;
+    }
+    default: {
+      console.log("Error: Room's last dealer is invalid: " + room.lastDealer); 
+      return null; 
+    }
+  }
+  return nextPlayer;
+}
+
 function shuffleDeck() {
   // Initializes an array of 54 integers [1,2,..54]
   let deck = [...Array(54+1).keys()].slice(1); 
@@ -51,25 +89,25 @@ async function createNewGame(room) {
   setPlayerHand(room.team2.player1._id, deck.splice(0,9));
   setPlayerHand(room.team2.player2._id, deck.splice(0,9));
 
-  if (room.lastDealer < 1 || room.lastDealer > 4) {
-    room.lastDealer = Math.floor(Math.random() * 4) + 1; 
+  if (room.lastDealer < 0 || room.lastDealer > 3) {
+    room.lastDealer = Math.floor(Math.random() * 4); 
   }
 
   let newDealer;
   switch(room.lastDealer) {
-    case 1: {
+    case 0: {
       newDealer = room.team1.player1._id; 
       break; 
     }
-    case 2: {
+    case 1: {
       newDealer = room.team2.player1._id;
       break;
     }
-    case 3: {
+    case 2: {
       newDealer = room.team1.player2._id; 
       break; 
     }
-    case 4: {
+    case 3: {
       newDealer = room.team2.player2._id; 
       break;
     }
@@ -82,14 +120,17 @@ async function createNewGame(room) {
   let newGame = new Game({
     deck: deck,
     bid: 0,
-    biddingTeam: 0,
+    biddingPlayer: null,
     suit: -1,
     activePlayer: newDealer,
+    activePlayerIndex: room.lastDealer, 
     team1Score: 0, 
     team2Score: 0,
     isActive: true
   });
 
+  room.lastDealer = (++room.lastDealer % 4); 
+  await room.save(); 
   return newGame.save();
 }
 
@@ -104,8 +145,6 @@ router.post('/hand', async (req, res) => {
     });
     return; 
   }
-  console.log('room retrieved to get active game');
-  console.log(room); 
   let hand; 
   if (req.body['teamId'] == room.team1) {
     // user is on team 1 
@@ -127,6 +166,70 @@ router.post('/hand', async (req, res) => {
   res.json({
     "status": "success", 
     "hand": hand 
+  });
+});
+
+router.post('/setBid', async (req, res) => {
+  // TODO Need to check if this user is the dealer -- if they are they are required to bid
+  let room = await getRoomByActivePlayer(req.body['player']);
+  if (!room) {
+    res.json({
+      "status": "error",
+      "details": "Error: User is not active in any known game"
+    });
+    return;
+  }
+
+  let bid = req.body['bid'];
+  if (bid > room.activeGame.bid) {
+    room.activeGame.bid = bid;
+  }
+  else {
+    res.json({
+      "status": "error",
+      "details": "Error: Bid set is lower than current bid"
+    });
+    return;
+  }
+
+  room.roomStatus = `${room.activeGame.activePlayer.displayName} has set the bid to ${room.activeGame.bid}!`;
+  room.activeGame.biddingPlayer = room.activeGame.activePlayer;
+  room.activeGame.activePlayerIndex = (++room.activeGame.activePlayerIndex % 4); 
+  room.activeGame.activePlayer = getNextPlayer(room); 
+
+  await room.activeGame.save(); 
+  await room.save();
+
+  req.app.io.to(room.short_id).emit('room-update', (room));
+
+  res.json({
+    "status": "success"
+  });
+});
+
+router.post('/passBid', async (req, res) => {
+  // TODO Need to check if this user is the dealer -- if they are they are required to bid
+  // This should be reflected on the frontend
+  let room = await getRoomByActivePlayer(req.body['player']);
+  if (!room) {
+    res.json({
+      "status": "error",
+      "details": "Error: User is not active in any known game"
+    });
+    return;
+  }
+  
+  room.roomStatus = `${room.activeGame.activePlayer.displayName} has passed the bid.`;
+  room.activeGame.activePlayerIndex = (++room.activeGame.activePlayerIndex % 4); 
+  room.activeGame.activePlayer = getNextPlayer(room); 
+
+  await room.activeGame.save(); 
+  await room.save();
+
+  req.app.io.to(room.short_id).emit('room-update', (room));
+  
+  res.json({
+    "status": "success"
   });
 });
 
