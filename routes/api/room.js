@@ -19,8 +19,22 @@ async function getRoom(roomId) {
 
 async function getRoomPopulated(roomId) {
   return await Room.findOne({ short_id: roomId.toUpperCase() })
-    .populate({ path: 'team1', populate: [{ path: 'player1', select: 'displayName isReady cardCount' }, { path: 'player2', select: 'displayName isReady cardCount' }]})
-    .populate({ path: 'team2', populate: [{ path: 'player1' }, { path: 'player2' }]}).populate({ path: 'activeGame', populate: [{ path: 'activePlayer', select: 'displayName isReady cardCount' }, { path: 'biddingPlayer', select: 'displayName isReady cardCount' }]});
+    .populate({ path: 'team1', 
+      populate: [
+        { path: 'player1', select: 'displayName isReady cardCount' }, 
+        { path: 'player2', select: 'displayName isReady cardCount' }
+      ]})
+    .populate({ path: 'team2', 
+      populate: [
+        { path: 'player1' }, 
+        { path: 'player2' }
+      ]})
+    .populate({ 
+      path: 'activeGame', select: 'bid suit biddingPlayer activePlayer activePlayerIndex team1Score team2Score', 
+        populate: [
+          { path: 'activePlayer', select: 'displayName isReady cardCount' },
+          { path: 'biddingPlayer', select: 'displayName isReady cardCount' }
+        ]});
 }
 
 async function startRoom(roomId) {
@@ -72,7 +86,7 @@ router.post('/', async (req, res) => {
   let newRoom = new Room({ 
     short_id: short_id.toUpperCase(),
     roomStatus: 'New room created',
-    lastDealer: -1,
+    dealer: -1,
     games: [],
     messages: [],
     team1: newTeams[0],
@@ -96,8 +110,6 @@ router.post('/', async (req, res) => {
 router.get('/:roomId', async (req, res) => {
   const roomId = req.params['roomId'].toUpperCase();
   let room = await getRoomPopulated(roomId);
-  console.log("Retrieved room");
-  console.log(room); 
   if (room == undefined) {
     res.json({
       "status": "error",

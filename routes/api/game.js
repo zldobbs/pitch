@@ -26,8 +26,23 @@ async function getRoomByActivePlayer(playerId) {
     return null;
   }
 
-  return await Room.findOne({ activeGame: game._id }).populate({ path: 'team1', populate: [{ path: 'player1', select: 'displayName isReady cardCount' }, { path: 'player2', select: 'displayName isReady cardCount' }]})
-  .populate({ path: 'team2', populate: [{ path: 'player1' }, { path: 'player2' }]}).populate({ path: 'activeGame', populate: { path: 'activePlayer', select: 'displayName isReady cardCount' }});
+  return await Room.findOne({ activeGame: game._id })
+    .populate({ path: 'team1', 
+      populate: [
+        { path: 'player1', select: 'displayName isReady cardCount' }, 
+        { path: 'player2', select: 'displayName isReady cardCount' }
+      ]})
+    .populate({ path: 'team2', 
+      populate: [
+        { path: 'player1' }, 
+        { path: 'player2' }
+      ]})
+    .populate({ 
+      path: 'activeGame', select: 'bid suit biddingPlayer activePlayer activePlayerIndex team1Score team2Score', 
+        populate: [
+          { path: 'activePlayer', select: 'displayName isReady cardCount' },
+          { path: 'biddingPlayer', select: 'displayName isReady cardCount' }
+        ]});
 }
 
 function getNextPlayer(room) {
@@ -50,11 +65,26 @@ function getNextPlayer(room) {
       break;
     }
     default: {
-      console.log("Error: Room's last dealer is invalid: " + room.lastDealer); 
       return null; 
     }
   }
   return nextPlayer;
+}
+
+function getPlayerIndex(room, player) { 
+  if (room.team1.player1._id === player._id) {
+    return 0; 
+  }
+  if (room.team2.player1._id === player._id) {
+    return 1; 
+  }
+  if (room.team1.player2._id === player._id) {
+    return 2; 
+  }
+  if (room.team2.player2._id === player._id) {
+    return 3; 
+  }
+  return -1; 
 }
 
 function shuffleDeck() {
@@ -89,30 +119,34 @@ async function createNewGame(room) {
   setPlayerHand(room.team2.player1._id, deck.splice(0,9));
   setPlayerHand(room.team2.player2._id, deck.splice(0,9));
 
-  if (room.lastDealer < 0 || room.lastDealer > 3) {
-    room.lastDealer = Math.floor(Math.random() * 4); 
+  if (room.dealer < 0 || room.dealer > 3) {
+    room.dealer = Math.floor(Math.random() * 4); 
+  }
+  else {
+    room.dealer = (++room.dealer % 4); 
   }
 
-  let newDealer;
-  switch(room.lastDealer) {
+  let firstPlayer;
+  let firstPlayerIndex = ((room.dealer + 1) % 4);
+  switch(firstPlayerIndex) {
     case 0: {
-      newDealer = room.team1.player1._id; 
+      firstPlayer = room.team1.player1._id; 
       break; 
     }
     case 1: {
-      newDealer = room.team2.player1._id;
+      firstPlayer = room.team2.player1._id;
       break;
     }
     case 2: {
-      newDealer = room.team1.player2._id; 
+      firstPlayer = room.team1.player2._id; 
       break; 
     }
     case 3: {
-      newDealer = room.team2.player2._id; 
+      firstPlayer = room.team2.player2._id; 
       break;
     }
     default: {
-      console.log("Error: Room's last dealer is invalid: " + room.lastDealer); 
+      console.log("Error: Room's last dealer is invalid: " + room.dealer); 
       return null; 
     }
   }
@@ -122,14 +156,13 @@ async function createNewGame(room) {
     bid: 0,
     biddingPlayer: null,
     suit: -1,
-    activePlayer: newDealer,
-    activePlayerIndex: room.lastDealer, 
+    activePlayer: firstPlayer,
+    activePlayerIndex: firstPlayerIndex, 
     team1Score: 0, 
     team2Score: 0,
     isActive: true
   });
 
-  room.lastDealer = (++room.lastDealer % 4); 
   await room.save(); 
   return newGame.save();
 }
@@ -192,10 +225,17 @@ router.post('/setBid', async (req, res) => {
     return;
   }
 
-  room.roomStatus = `${room.activeGame.activePlayer.displayName} has set the bid to ${room.activeGame.bid}!`;
   room.activeGame.biddingPlayer = room.activeGame.activePlayer;
-  room.activeGame.activePlayerIndex = (++room.activeGame.activePlayerIndex % 4); 
-  room.activeGame.activePlayer = getNextPlayer(room); 
+
+  if (room.dealer === room.activeGame.activePlayerIndex) {
+    room.roomStatus = `${room.activeGame.activePlayer.displayName} has won the bid with ${room.activeGame.bid}! They will now set the suit...`;
+    room.activeGame.activePlayerIndex
+  }
+  else {
+    room.roomStatus = `${room.activeGame.activePlayer.displayName} has set the bid to ${room.activeGame.bid}!`;
+    room.activeGame.activePlayerIndex = (++room.activeGame.activePlayerIndex % 4); 
+    room.activeGame.activePlayer = getNextPlayer(room); 
+  }
 
   await room.activeGame.save(); 
   await room.save();
@@ -218,11 +258,26 @@ router.post('/passBid', async (req, res) => {
     });
     return;
   }
-  
-  room.roomStatus = `${room.activeGame.activePlayer.displayName} has passed the bid.`;
-  room.activeGame.activePlayerIndex = (++room.activeGame.activePlayerIndex % 4); 
-  room.activeGame.activePlayer = getNextPlayer(room); 
 
+  if (room.dealer === room.activeGame.activePlayerIndex) {
+    if (room.activeGame.bid === 0) {
+      res.json({
+        "status": "error",
+        "details": "Error: You must set the bid!"
+      });
+      return; 
+    }
+
+    room.activeGame.activePlayer = room.activeGame.biddingPlayer; 
+    room.activeGame.activePlayerIndex = getPlayerIndex(room, room.activeGame.activePlayer); 
+    room.roomStatus = `${room.activeGame.activePlayer.displayName} has won the bid with ${room.activeGame.bid}! They will now set the suit...`;
+  }
+  else {
+    room.roomStatus = `${room.activeGame.activePlayer.displayName} has passed the bid.`;
+    room.activeGame.activePlayerIndex = (++room.activeGame.activePlayerIndex % 4); 
+    room.activeGame.activePlayer = getNextPlayer(room); 
+  }
+  
   await room.activeGame.save(); 
   await room.save();
 
