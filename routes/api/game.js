@@ -34,11 +34,11 @@ async function getRoomByActivePlayer(playerId) {
       ]})
     .populate({ path: 'team2', 
       populate: [
-        { path: 'player1' }, 
-        { path: 'player2' }
+        { path: 'player1', select: 'displayName isReady cardCount' }, 
+        { path: 'player2', select: 'displayName isReady cardCount' }
       ]})
     .populate({ 
-      path: 'activeGame', select: 'bid suit biddingPlayer activePlayer activePlayerIndex team1Score team2Score', 
+      path: 'activeGame', select: 'bid suit suitName biddingPlayer activePlayer activePlayerIndex team1Score team2Score', 
         populate: [
           { path: 'activePlayer', select: 'displayName isReady cardCount' },
           { path: 'biddingPlayer', select: 'displayName isReady cardCount' }
@@ -110,6 +110,72 @@ async function setPlayerHand(playerId, hand) {
   return; 
 }
 
+function getOffJack(suit) {
+  switch (suit) {
+    case 0: {
+      return 49;
+    }
+    case 1: {
+      return 36;
+    }
+    case 2: {
+      return 23;
+    }
+    case 3: {
+      return 10; 
+    }
+    default: {
+      console.log("Invalid suit provided: " + suit);
+      return -1; 
+    }
+  }
+}
+
+async function updateHandForSuit(playerId, roomId) {
+  let room = await Room.findOne({ _id: roomId }).populate('activeGame');
+  if (playerId.toString() != room.activeGame.activePlayer.toString()) {
+    let player = await Player.getPlayerWithCards(playerId); 
+
+    // Remove any cards that do not fit in the given suit
+    let suitLowerBound = (13 * room.activeGame.suit) + 1;
+    let suitUpperBound = 13 * (room.activeGame.suit + 1);
+    let newHand = [];
+    for (let i = 0; i < player.cardCount; i++) {
+      let card = player.hand[i];
+      if (card > 52 || card == getOffJack(room.activeGame.suit) || (card >= suitLowerBound && card <= suitUpperBound)) {
+        newHand.push(card); 
+      }
+    }
+    
+    // Now draw from the deck until newHand is exactly 6 cards
+    let newDeck = room.activeGame.deck.slice();
+    let newCards = newDeck.splice(0, (6 - newHand.length));
+    newHand = newHand.concat(newCards);
+    newHand = newHand.sort((a, b) => a - b);
+    player.hand = newHand.slice();
+    player.cardCount = newHand.length;
+    room.activeGame.deck = newDeck; 
+
+    await player.save(); 
+    await room.activeGame.save(); 
+  }
+}
+
+async function updateHandWithDeck(playerId, roomId) {
+  let room = await Room.findOne({ _id: roomId }).populate('activeGame');
+  if (playerId.toString() == room.activeGame.activePlayer.toString()) {
+    let player = await Player.getPlayerWithCards(playerId); 
+
+    // Give the active player the deck
+    let newHand = player.hand.concat(room.activeGame.deck);
+    newHand = newHand.sort((a, b) => a - b);
+    player.hand = newHand.slice();
+    player.cardCount = newHand.length;
+
+    await player.save(); 
+  }
+}
+
 async function createNewGame(room) {
   let deck = shuffleDeck(); 
   
@@ -153,9 +219,11 @@ async function createNewGame(room) {
 
   let newGame = new Game({
     deck: deck,
+    table: [],
     bid: 0,
     biddingPlayer: null,
     suit: -1,
+    suitName: '',
     activePlayer: firstPlayer,
     activePlayerIndex: firstPlayerIndex, 
     team1Score: 0, 
@@ -203,7 +271,6 @@ router.post('/hand', async (req, res) => {
 });
 
 router.post('/setBid', async (req, res) => {
-  // TODO Need to check if this user is the dealer -- if they are they are required to bid
   let room = await getRoomByActivePlayer(req.body['player']);
   if (!room) {
     res.json({
@@ -248,7 +315,6 @@ router.post('/setBid', async (req, res) => {
 });
 
 router.post('/passBid', async (req, res) => {
-  // TODO Need to check if this user is the dealer -- if they are they are required to bid
   // This should be reflected on the frontend
   let room = await getRoomByActivePlayer(req.body['player']);
   if (!room) {
@@ -283,6 +349,98 @@ router.post('/passBid', async (req, res) => {
 
   req.app.io.to(room.short_id).emit('room-update', (room));
   
+  res.json({
+    "status": "success"
+  });
+});
+
+router.post('/setSuit', async (req, res) => {
+  let room = await getRoomByActivePlayer(req.body['player']);
+  if (!room) {
+    res.json({
+      "status": "error",
+      "details": "Error: User is not active in any known game"
+    });
+    return;
+  }
+
+  switch (req.body['suit']) {
+    case 0: {
+      room.activeGame.suitName = 'Clubs';
+      break; 
+    }
+    case 1: {
+      room.activeGame.suitName = 'Diamonds';
+      break; 
+    }
+    case 2: {
+      room.activeGame.suitName = 'Hearts';
+      break;
+    }
+    case 3: {
+      room.activeGame.suitName = 'Spades';
+      break;
+    }
+    default: {
+      res.json({
+        "status": "error",
+        "details": "Invalid suit selected"
+      });
+      return; 
+    }
+  }
+
+  room.activeGame.suit = req.body['suit'];
+  await room.activeGame.save(); 
+
+  // Update all players hands to reflect new suit..
+  await updateHandForSuit(room.team1.player1._id, room._id); 
+  await updateHandForSuit(room.team1.player2._id, room._id); 
+  await updateHandForSuit(room.team2.player1._id, room._id); 
+  await updateHandForSuit(room.team2.player2._id, room._id); 
+
+  await updateHandWithDeck(room.activeGame.activePlayer._id, room._id); 
+
+  room.roomStatus = `${room.activeGame.activePlayer.displayName} set the suit to ${room.activeGame.suitName}! Hands have been updated. Wait for players to discard extra cards.`;
+
+  await room.activeGame.activePlayer.save();
+  await room.save();
+
+  const updatedRoom = await getRoomByActivePlayer(req.body['player']);
+  req.app.io.to(room.short_id).emit('room-update', (updatedRoom));
+
+  res.json({
+    "status": "success"
+  });
+});
+
+router.post('/pickCards', async (req, res) => {
+  let room = await getRoomByActivePlayer(req.body['activePlayer']);
+  if (!room) {
+    res.json({
+      "status": "error",
+      "details": "Error: User is not active in any known game"
+    });
+    return;
+  }
+
+  await setPlayerHand(req.body['player'], req.body['hand']);
+
+  const updatedRoom = await getRoomByActivePlayer(req.body['activePlayer']);
+
+  // Check if all players now have correct hands 
+  if (
+    updatedRoom.team1.player1.cardCount === 6 &&
+    updatedRoom.team1.player2.cardCount === 6 &&
+    updatedRoom.team2.player1.cardCount === 6 &&
+    updatedRoom.team2.player2.cardCount === 6
+  ) {
+    updatedRoom.roomStatus = `Hands are ready! ${updatedRoom.activeGame.activePlayer.displayName} starts.`;
+    await updatedRoom.save();
+  }
+
+  req.app.io.to(room.short_id).emit('room-update', (updatedRoom));
+
   res.json({
     "status": "success"
   });

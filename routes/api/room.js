@@ -30,7 +30,7 @@ async function getRoomPopulated(roomId) {
         { path: 'player2' }
       ]})
     .populate({ 
-      path: 'activeGame', select: 'bid suit biddingPlayer activePlayer activePlayerIndex team1Score team2Score', 
+      path: 'activeGame', select: 'bid suit suitName biddingPlayer activePlayer activePlayerIndex team1Score team2Score', 
         populate: [
           { path: 'activePlayer', select: 'displayName isReady cardCount' },
           { path: 'biddingPlayer', select: 'displayName isReady cardCount' }
