@@ -16,7 +16,8 @@ const GameSchema = mongoose.Schema({
     activePlayerIndex: Number,
     team1Score: Number,
     team2Score: Number,
-    isActive: Boolean
+    isActive: Boolean,
+    handsSet: Boolean
 });
 
 const Game = module.exports = mongoose.model('Game', GameSchema);

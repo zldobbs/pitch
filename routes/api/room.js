@@ -21,13 +21,13 @@ async function getRoomPopulated(roomId) {
   return await Room.findOne({ short_id: roomId.toUpperCase() })
     .populate({ path: 'team1', 
       populate: [
-        { path: 'player1', select: 'displayName isReady cardCount' }, 
-        { path: 'player2', select: 'displayName isReady cardCount' }
+        { path: 'player1', select: 'displayName isReady cardCount playedCard' }, 
+        { path: 'player2', select: 'displayName isReady cardCount playedCard' }
       ]})
     .populate({ path: 'team2', 
       populate: [
-        { path: 'player1' }, 
-        { path: 'player2' }
+        { path: 'player1', select: 'displayName isReady cardCount playedCard' }, 
+        { path: 'player2', select: 'displayName isReady cardCount playedCard' }
       ]})
     .populate({ 
       path: 'activeGame', select: 'bid suit suitName biddingPlayer activePlayer activePlayerIndex team1Score team2Score', 

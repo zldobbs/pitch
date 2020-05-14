@@ -29,13 +29,13 @@ async function getRoomByActivePlayer(playerId) {
   return await Room.findOne({ activeGame: game._id })
     .populate({ path: 'team1', 
       populate: [
-        { path: 'player1', select: 'displayName isReady cardCount' }, 
-        { path: 'player2', select: 'displayName isReady cardCount' }
+        { path: 'player1', select: 'displayName isReady cardCount playedCard' }, 
+        { path: 'player2', select: 'displayName isReady cardCount playedCard' }
       ]})
     .populate({ path: 'team2', 
       populate: [
-        { path: 'player1', select: 'displayName isReady cardCount' }, 
-        { path: 'player2', select: 'displayName isReady cardCount' }
+        { path: 'player1', select: 'displayName isReady cardCount playedCard' }, 
+        { path: 'player2', select: 'displayName isReady cardCount playedCard' }
       ]})
     .populate({ 
       path: 'activeGame', select: 'bid suit suitName biddingPlayer activePlayer activePlayerIndex team1Score team2Score', 
@@ -228,7 +228,8 @@ async function createNewGame(room) {
     activePlayerIndex: firstPlayerIndex, 
     team1Score: 0, 
     team2Score: 0,
-    isActive: true
+    isActive: true,
+    handsSet: false
   });
 
   await room.save(); 
@@ -296,7 +297,6 @@ router.post('/setBid', async (req, res) => {
 
   if (room.dealer === room.activeGame.activePlayerIndex) {
     room.roomStatus = `${room.activeGame.activePlayer.displayName} has won the bid with ${room.activeGame.bid}! They will now set the suit...`;
-    room.activeGame.activePlayerIndex
   }
   else {
     room.roomStatus = `${room.activeGame.activePlayer.displayName} has set the bid to ${room.activeGame.bid}!`;
@@ -436,8 +436,81 @@ router.post('/pickCards', async (req, res) => {
     updatedRoom.team2.player2.cardCount === 6
   ) {
     updatedRoom.roomStatus = `Hands are ready! ${updatedRoom.activeGame.activePlayer.displayName} starts.`;
+    updatedRoom.activeGame.handsSet = true; 
+    await updatedRoom.activeGame.save();
     await updatedRoom.save();
   }
+
+  req.app.io.to(room.short_id).emit('room-update', (updatedRoom));
+
+  res.json({
+    "status": "success"
+  });
+});
+
+router.post('/playCard', async (req, res) => {
+  // TODO Verify that played card is on suit if necessary 
+  let room = await getRoomByActivePlayer(req.body['player']);
+  if (!room) {
+    res.json({
+      "status": "error",
+      "details": "Error: User is not active in any known game"
+    });
+    return;
+  }
+
+  let player = await Player.getPlayerWithCards(req.body['player']);
+  if (player.hand.length > 6) {
+    res.json({
+      "status": "error",
+      "details": "Error: User has more than 6 cards"
+    });
+    return;
+  }
+
+  let cardIndex = player.hand.indexOf(req.body['card']);
+  if (cardIndex < 0) {
+    res.json({
+      "status": "error",
+      "details": "Error: User does not have the card played"
+    });
+    return;
+  }
+
+  player.hand.splice(cardIndex, 1); 
+  player.cardCount = player.hand.length;
+  player.playedCard = req.body['card'];
+  await player.save(); 
+
+  let updatedRoom = await getRoomByActivePlayer(req.body['player']);
+
+  // Check if all players have played (that aren't out)
+  if (
+    (updatedRoom.team1.player1.playedCard !== -1 || updatedRoom.team1.player1.cardCount === 0) &&
+    (updatedRoom.team1.player2.playedCard !== -1 || updatedRoom.team1.player2.cardCount === 0) &&
+    (updatedRoom.team2.player1.playedCard !== -1 || updatedRoom.team2.player1.cardCount === 0) &&
+    (updatedRoom.team2.player2.playedCard !== -1 || updatedRoom.team2.player2.cardCount === 0)
+  ) {
+    // TODO Score hands
+    // Set scores for each team
+    // Set team down if they bid and lost 
+    // Set active player to player with highest card 
+  }
+  else {
+    //console.log(`1. ${updatedRoom.activeGame.activePlayerIndex} - ${updatedRoom.activeGame.activePlayer.displayName}`);
+    updatedRoom.activeGame.activePlayerIndex = (++updatedRoom.activeGame.activePlayerIndex % 4); 
+    updatedRoom.activeGame.activePlayer = getNextPlayer(updatedRoom); 
+    //console.log(`2. ${updatedRoom.activeGame.activePlayerIndex} - ${updatedRoom.activeGame.activePlayer.displayName}`);
+    while (updatedRoom.activeGame.activePlayer.cardCount <= 0) {
+      updatedRoom.activeGame.activePlayerIndex = (++updatedRoom.activeGame.activePlayerIndex % 4); 
+      updatedRoom.activeGame.activePlayer = getNextPlayer(updatedRoom);  
+      //console.log(`i... ${updatedRoom.activeGame.activePlayerIndex} - ${updatedRoom.activeGame.activePlayer.displayName}`);
+    }
+  }
+
+  updatedRoom.roomStatus = `${updatedRoom.activeGame.activePlayer.displayName} is up.`;
+  await updatedRoom.activeGame.save();
+  await updatedRoom.save(); 
 
   req.app.io.to(room.short_id).emit('room-update', (updatedRoom));
 

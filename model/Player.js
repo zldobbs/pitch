@@ -13,7 +13,8 @@ const PlayerSchema = mongoose.Schema({
     displayName: String,
     isReady: Boolean,
     hand: [Number],
-    cardCount: Number
+    cardCount: Number,
+    playedCard: Number
 });
 
 const Player = module.exports = mongoose.model('Player', PlayerSchema);
@@ -41,7 +42,8 @@ module.exports.createPlayer = async (user) => {
     displayName: displayName,
     isReady: false, 
     hand: [], 
-    cardCount: 0
+    cardCount: 0,
+    playedCard: -1
   });
 
   return newPlayer.save();
