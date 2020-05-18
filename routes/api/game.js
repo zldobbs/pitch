@@ -72,19 +72,19 @@ function getNextPlayer(room) {
 }
 
 function getPlayerIndex(room, player) { 
-  if (room.team1.player1._id === player._id) {
+  if (room.team1.player1._id.toString() === player._id.toString()) {
     return 0; 
   }
-  if (room.team2.player1._id === player._id) {
+  if (room.team2.player1._id.toString() === player._id.toString()) {
     return 1; 
   }
-  if (room.team1.player2._id === player._id) {
+  if (room.team1.player2._id.toString() === player._id.toString()) {
     return 2; 
   }
-  if (room.team2.player2._id === player._id) {
+  if (room.team2.player2._id.toString() === player._id.toString()) {
     return 3; 
   }
-  return -1; 
+  return -1;
 }
 
 function shuffleDeck() {
@@ -335,7 +335,7 @@ router.post('/passBid', async (req, res) => {
     }
 
     room.activeGame.activePlayer = room.activeGame.biddingPlayer; 
-    room.activeGame.activePlayerIndex = getPlayerIndex(room, room.activeGame.activePlayer); 
+    room.activeGame.activePlayerIndex = getPlayerIndex(room, room.activeGame.biddingPlayer); 
     room.roomStatus = `${room.activeGame.activePlayer.displayName} has won the bid with ${room.activeGame.bid}! They will now set the suit...`;
   }
   else {
