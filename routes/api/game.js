@@ -38,7 +38,7 @@ async function getRoomByActivePlayer(playerId) {
         { path: 'player2', select: 'displayName isReady cardCount playedCard' }
       ]})
     .populate({ 
-      path: 'activeGame', select: 'bid suit suitName biddingPlayer activePlayer activePlayerIndex team1Score team2Score', 
+      path: 'activeGame', select: 'bid suit ledSuit suitName biddingPlayer activePlayer activePlayerIndex team1Score team2Score', 
         populate: [
           { path: 'activePlayer', select: 'displayName isReady cardCount' },
           { path: 'biddingPlayer', select: 'displayName isReady cardCount' }
@@ -110,6 +110,7 @@ async function setPlayerHand(playerId, hand) {
   return; 
 }
 
+// Gets the card number of the jack on the off suit 
 function getOffJack(suit) {
   switch (suit) {
     case 0: {
@@ -223,6 +224,7 @@ async function createNewGame(room) {
     bid: 0,
     biddingPlayer: null,
     suit: -1,
+    ledSuit: -1,
     suitName: '',
     activePlayer: firstPlayer,
     activePlayerIndex: firstPlayerIndex, 
@@ -449,7 +451,6 @@ router.post('/pickCards', async (req, res) => {
 });
 
 router.post('/playCard', async (req, res) => {
-  // TODO Verify that played card is on suit if necessary 
   let room = await getRoomByActivePlayer(req.body['player']);
   if (!room) {
     res.json({
@@ -477,6 +478,25 @@ router.post('/playCard', async (req, res) => {
     return;
   }
 
+  // Check if the ledSuit has been set yet
+  let requestedSuit = Math.floor(req.body['card'] / 13);
+  if (room.activeGame.ledSuit === -1) {
+    // Set ledSuit to the suit of the card played
+    room.activeGame.ledSuit = requestedSuit;
+    await room.activeGame.save();
+  }
+  else if (
+      room.activeGame.ledSuit === room.activeGame.suit && 
+      requestedSuit < 4 &&
+      requestedSuit !== room.activeGame.suit && 
+      getOffJack(room.activeGame.ledSuit) !== req.body['card']) {
+    res.json({
+      "status": "error",
+      "details": "User must bet the on suit!"
+    });
+    return; 
+  }
+
   player.hand.splice(cardIndex, 1); 
   player.cardCount = player.hand.length;
   player.playedCard = req.body['card'];
@@ -495,20 +515,19 @@ router.post('/playCard', async (req, res) => {
     // Set scores for each team
     // Set team down if they bid and lost 
     // Set active player to player with highest card 
+    // Set led suit to -1 
   }
   else {
-    //console.log(`1. ${updatedRoom.activeGame.activePlayerIndex} - ${updatedRoom.activeGame.activePlayer.displayName}`);
     updatedRoom.activeGame.activePlayerIndex = (++updatedRoom.activeGame.activePlayerIndex % 4); 
     updatedRoom.activeGame.activePlayer = getNextPlayer(updatedRoom); 
-    //console.log(`2. ${updatedRoom.activeGame.activePlayerIndex} - ${updatedRoom.activeGame.activePlayer.displayName}`);
     while (updatedRoom.activeGame.activePlayer.cardCount <= 0) {
       updatedRoom.activeGame.activePlayerIndex = (++updatedRoom.activeGame.activePlayerIndex % 4); 
       updatedRoom.activeGame.activePlayer = getNextPlayer(updatedRoom);  
-      //console.log(`i... ${updatedRoom.activeGame.activePlayerIndex} - ${updatedRoom.activeGame.activePlayer.displayName}`);
     }
+
+    updatedRoom.roomStatus = `${updatedRoom.activeGame.activePlayer.displayName} is up.`;
   }
 
-  updatedRoom.roomStatus = `${updatedRoom.activeGame.activePlayer.displayName} is up.`;
   await updatedRoom.activeGame.save();
   await updatedRoom.save(); 
 

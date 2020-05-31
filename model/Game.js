@@ -11,6 +11,7 @@ const GameSchema = mongoose.Schema({
     bid: Number,
     biddingPlayer: { type: mongoose.Schema.Types.ObjectId, ref: 'Player' }, 
     suit: Number, 
+    ledSuit: Number,
     suitName: String,
     activePlayer: { type: mongoose.Schema.Types.ObjectId, ref: 'Player' },
     activePlayerIndex: Number,
