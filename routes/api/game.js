@@ -479,7 +479,7 @@ router.post('/playCard', async (req, res) => {
   }
 
   // Check if the ledSuit has been set yet
-  let requestedSuit = Math.floor(req.body['card'] / 13);
+  let requestedSuit = Math.floor((req.body['card'] - 1)/ 13);
   if (room.activeGame.ledSuit === -1) {
     // Set ledSuit to the suit of the card played
     room.activeGame.ledSuit = requestedSuit;
