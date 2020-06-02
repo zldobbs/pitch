@@ -450,6 +450,70 @@ router.post('/pickCards', async (req, res) => {
   });
 });
 
+router.post('/goOut', async (req, res) => {
+  let room = await getRoomByActivePlayer(req.body['activePlayer']);
+  if (!room) {
+    res.json({
+      "status": "error",
+      "details": "Error: Active player is not in a known game"
+    });
+    return; 
+  }
+
+  let player = await Player.getPlayerWithCards(req.body['player']);
+  if (getPlayerIndex(room, player) === -1) {
+    res.json({
+      "status": "error",
+      "details": "Error: Player attempting to play is not in same game as active player"
+    });
+    return; 
+  }
+
+  player.hand = []; 
+  player.cardCount = 0;
+  await player.save(); 
+
+  let updatedRoom = await getRoomByActivePlayer(req.body['player']);
+
+  if (req.body['activePlayer'] === req.body['player']) {
+    // Check if all players have played (that aren't out)
+    if (
+      (updatedRoom.team1.player1.playedCard !== -1 || updatedRoom.team1.player1.cardCount === 0) &&
+      (updatedRoom.team1.player2.playedCard !== -1 || updatedRoom.team1.player2.cardCount === 0) &&
+      (updatedRoom.team2.player1.playedCard !== -1 || updatedRoom.team2.player1.cardCount === 0) &&
+      (updatedRoom.team2.player2.playedCard !== -1 || updatedRoom.team2.player2.cardCount === 0)
+    ) {
+      // TODO Score hands
+      // Set scores for each team
+      // Set team down if they bid and lost 
+      // Set active player to player with highest card 
+      // Set led suit to -1 
+    }
+    else {
+      updatedRoom.activeGame.activePlayerIndex = (++updatedRoom.activeGame.activePlayerIndex % 4); 
+      updatedRoom.activeGame.activePlayer = getNextPlayer(updatedRoom); 
+      while (updatedRoom.activeGame.activePlayer.cardCount <= 0) {
+        updatedRoom.activeGame.activePlayerIndex = (++updatedRoom.activeGame.activePlayerIndex % 4); 
+        updatedRoom.activeGame.activePlayer = getNextPlayer(updatedRoom);  
+      }
+  
+      updatedRoom.roomStatus = `${player.displayName} has gone out. ${updatedRoom.activeGame.activePlayer.displayName} is now up.`;
+    }
+
+    await updatedRoom.activeGame.save();
+  }
+
+  updatedRoom.roomStatus = `${player.displayName} has gone out. ${updatedRoom.activeGame.activePlayer.displayName} is still up.`;
+  
+  await updatedRoom.save(); 
+
+  req.app.io.to(room.short_id).emit('room-update', (updatedRoom));
+
+  res.json({
+    "status": "success"
+  });
+});
+
 router.post('/playCard', async (req, res) => {
   let room = await getRoomByActivePlayer(req.body['player']);
   if (!room) {
@@ -491,8 +555,8 @@ router.post('/playCard', async (req, res) => {
       requestedSuit !== room.activeGame.suit && 
       getOffJack(room.activeGame.ledSuit) !== req.body['card']) {
     res.json({
-      "status": "error",
-      "details": "User must bet the on suit!"
+      "status": "invalidSuit",
+      "details": `The on suit was led. You must bet in ${room.activeGame.suitName}`
     });
     return; 
   }
