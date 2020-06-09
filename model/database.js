@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const auth = require("../auth.json");
 
 mongoose.connect(
+    process.env.MONGODB_URI || 
     'mongodb://' + auth.db.ipaddr + ':' + auth.db.port + '/pitch',
     { user: auth.db.user, pass: auth.db.pass }
 );
@@ -21,5 +22,5 @@ process.on('SIGINT', function() {
 let db = mongoose.connection;
 db.on('error', console.error.bind(console, 'connection error:'));
 db.once('open', function() {
-    console.log('Connected to database');
+    console.log('Connected to database: ' + auth.db.ipaddr);
 }); 

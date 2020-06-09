@@ -4,7 +4,8 @@
   "description": "Pitch card game",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon ./index.js"
+    "dev": "nodemon ./index.js",
+    "heroku-postbuild": "cd client && npm install && npm run build"
   },
   "author": "Zach Dobbs",
   "license": "ISC",

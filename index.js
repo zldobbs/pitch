@@ -2,6 +2,7 @@
 
 const auth = require("./auth.json");
 const express = require("express");
+const path = require('path');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const app = express();
@@ -43,6 +44,14 @@ server.listen(port, () => {
   // TODO Create a new function to cleanup any rooms w/o games associated with them when server starts 
   console.log(`Listening to requests on http://localhost:${port}`);
 });
+
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static('pitch-client/build'));
+
+  app.get('*', (req, res) => {
+    res.sendFile(path.resolve(__dirname, 'pitch-client', 'build', 'index.html'));
+  })
+}
 
 // socket.io setup
 io.on('connection', (socket) => {
