@@ -17,6 +17,8 @@ const GameSchema = mongoose.Schema({
     activePlayerIndex: Number,
     team1Score: Number,
     team2Score: Number,
+    team1PointsInRound: Number,
+    team2PointsInRound: Number, 
     isActive: Boolean,
     handsSet: Boolean
 });

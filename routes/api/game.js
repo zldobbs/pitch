@@ -38,7 +38,7 @@ async function getRoomByActivePlayer(playerId) {
         { path: 'player2', select: 'displayName isReady cardCount playedCard' }
       ]})
     .populate({ 
-      path: 'activeGame', select: 'bid suit ledSuit suitName biddingPlayer activePlayer activePlayerIndex team1Score team2Score', 
+      path: 'activeGame', select: 'bid suit ledSuit suitName biddingPlayer activePlayer activePlayerIndex team1Score team2Score team1PointsInRound team2PointsInRound', 
         populate: [
           { path: 'activePlayer', select: 'displayName isReady cardCount' },
           { path: 'biddingPlayer', select: 'displayName isReady cardCount' }
@@ -177,15 +177,241 @@ async function updateHandWithDeck(playerId, roomId) {
   }
 }
 
-async function createNewGame(room) {
-  let deck = shuffleDeck(); 
-  
-  // Give 9 cards to each player, denotes their hands 
-  setPlayerHand(room.team1.player1._id, deck.splice(0,9));
-  setPlayerHand(room.team1.player2._id, deck.splice(0,9));
-  setPlayerHand(room.team2.player1._id, deck.splice(0,9));
-  setPlayerHand(room.team2.player2._id, deck.splice(0,9));
+async function startNewRound(room) {
+  let firstPlayer = findDealer(room); 
 
+  room.activeGame.deck = deal(room); 
+  room.activeGame.table = [];
+  room.activeGame.bid = 0;
+  room.activeGame.biddingPlayer = null;
+  room.activeGame.suit = -1;
+  room.activeGame.ledSuit = -1;
+  room.activeGame.activePlayer = firstPlayer[0];
+  room.activeGame.activePlayerIndex = firstPlayer[1];
+  room.activeGame.team1PointsInRound = 0; 
+  room.activeGame.team2PointsInRound = 0; 
+  room.activeGame.handsSet = false; 
+
+  await room.activeGame.save(); 
+
+  let players = [room.team1.player1, room.team1.player2, room.team2.player1, room.team2.player2];
+  players.forEach(async (player) => {
+    player.playedCard = -1;
+    await player.save();  
+  });
+}
+
+async function advanceRound(room) {
+  // Advance the active game to the next step
+  // Need to check if this is the end of the current round 
+  // If it is the end of the current round.. 
+  // - Check which team has more points 
+  // -- If it is not the bidding team, they have been set. Subtract the bid from their current score
+  // -- Add points to team scores otherwise 
+  // - Will then need to clear round specific stuff. Go back to the point of dealing cards. 
+  // - NOTE The above steps could probably be accomplished by factoring out some logic from createNewGame()
+  // If it is not the end of the current round..
+  // - All player's layed cards are cleared 
+  // - ActivePlayer is set to up 
+  // - Led suit is cleared 
+
+  // Check if all players are out of cards (round would be over)
+  if (room.team1.player1.cardCount === 0 && room.team1.player2.cardCount === 0 &&
+      room.team2.player1.cardCount === 0 && room.team2.player2.cardCount === 0) {
+    // See if team made bid 
+    let players = [room.team1.player1._id.toString(), room.team1.player2._id.toString(), room.team2.player1._id.toString(), room.team2.player2._id.toString()];
+    let biddingTeam = players.indexOf(room.activeGame.biddingPlayer._id.toString()); 
+    biddingTeam = (biddingTeam > 1 ? 2 : 1);
+    if (biddingTeam === 1) {
+      if (room.activeGame.team1PointsInRound >= room.activeGame.bid) {
+        // Team made their bid
+        room.activeGame.team1Score += room.activeGame.team1PointsInRound;
+        room.roomStatus = `Team 1 has made their bid!`;
+      }
+      else {
+        // Team has been set
+        room.activeGame.team1Score -= room.activeGame.bid; 
+        room.roomStatus = `Team 1 has been set!`;
+      }
+      room.activeGame.team2Score += room.activeGame.team2PointsInRound; 
+    }
+    else {
+      if (room.activeGame.team2PointsInRound >= room.activeGame.bid) {
+        // Team made their bid
+        room.activeGame.team2Score += room.activeGame.team2PointsInRound;
+        room.roomStatus = `Team 2 has made their bid!`;
+      }
+      else {
+        // Team has been set
+        room.activeGame.team2Score -= room.activeGame.bid;
+        room.roomStatus = `Team 2 has been set!`; 
+      }
+      room.activeGame.team1Score += room.activeGame.team1PointsInRound; 
+    }
+
+    if (room.activeGame.team1Score >= 31 || room.activeGame.team2Score >= 31) {
+      let winningTeam = 0; 
+      if (room.activeGame.team1Score >= 31 && room.activeGame.team2Score >= 31) {
+        // Winning team goes out...
+        winningTeam = biddingTeam; 
+      }
+      else  {
+        winningTeam = (room.activeGame.team1Score >= 31 ? 1 : 2);
+      }
+
+      room.roomStatus = `Team ${winningTeam} has won the game! The final score is (Team 1) ${room.activeGame.team1Score} - ${room.activeGame.team2Score} (Team 2)`;
+
+      let players = [room.team1.player1, room.team1.player2, room.team2.player1, room.team2.player2];
+      players.forEach(async (player) => {
+        player.playedCard = -1;
+        await player.save();  
+      });
+    }
+    else {
+      room.roomStatus += ` The score is now (Team 1) ${room.activeGame.team1Score} - ${room.activeGame.team2Score} (Team 2)`;
+      await startNewRound(room);
+    }
+  }
+  // Prepare for next hand of round 
+  else {
+    // Clear table of played cards
+    let players = [room.team1.player1, room.team1.player2, room.team2.player1, room.team2.player2];
+
+    players.forEach(async (player) => {
+      player.playedCard = -1;
+      await player.save(); 
+    });
+
+    // Clear led suit
+    room.activeGame.ledSuit = -1;
+
+    room.roomStatus = `New round starting! ${room.activeGame.activePlayer.displayName} is now up.`;
+  }
+    
+  await room.activeGame.save();
+  await room.save(); 
+
+  return room;
+}
+
+async function scoreHand(room) { 
+  // How do you win a hand?
+  // Generally...
+  // - Have the highest on suit card (remembering that off jack is greater than big joker, small joker, 10)
+  // - 2 will automatically give the playing team a point 
+  // - 3 will give 3 points to the winning team
+  // - 10, LJ, BJ, OffJ, OnJ, A all give winning team a point 
+  // - Active player becomes winning player
+  // - If no on suit is played, active player remains the same
+
+  // Define the range of card numbers of the selected suit
+  // i.e. if diamonds are the on suit, this array should be [14, 15, .., 26]
+  let onSuitRange = [...Array(13).keys()].map(x => ++x + (13 * room.activeGame.suit));
+
+  // Append special cards to the onSuitRange (jokers, off jack)
+  let offJack = getOffJack(room.activeGame.suit);
+  onSuitRange.splice(9, 0, 53, 54, offJack);
+  
+  // Indeces of players cards will tell us who won the round
+  let winningPlayer = null;
+  let winningTeam = -1;
+  let highestCard = 0;
+
+  // Keep track of points in this hand 
+  // 3, 10, LittleJoker, BigJoker, OffJack, OnJack, Ace
+  let pointCards = [9, 10, 11, 12, 13, 16];
+  let pointsGot = 0; 
+  let teamLaidTwo = 0; 
+
+  // Player array
+  let players = [room.team1.player1, room.team1.player2, room.team2.player1, room.team2.player2];
+
+  // Check each players cards
+  players.forEach((player, i) => {
+    let playerBaseCardValue = onSuitRange.indexOf(player.playedCard) + 1;
+    if (playerBaseCardValue > 0) {
+      // Check if this card is winning 
+      if (playerBaseCardValue > highestCard) { 
+        winningPlayer = player;
+        winningTeam = (i < 2 ? 1 : 2);
+        highestCard = playerBaseCardValue;
+      }
+  
+      // TODO Would be nice to store the actual cards that the teams have earned
+      // Check if this card contained any points 
+      if (pointCards.indexOf(playerBaseCardValue) > -1) {
+        pointsGot++;
+      } 
+      // Special case, if the card is a 2 automatically grant one point to the laying team
+      else if (playerBaseCardValue === 1) {
+        if (i < 2) {
+          // award points to team1
+          room.activeGame.team1PointsInRound++;
+          teamLaidTwo = 1; 
+        }
+        else {
+          // award points to team2
+          room.activeGame.team2PointsInRound++;
+          teamLaidTwo = 2; 
+        }
+      }
+      // Special case, if the card is a 3 the point value is 3 points rather than 1
+      else if (playerBaseCardValue === 2) {
+        pointsGot += 3;  
+      }
+    }
+  });
+
+  switch (winningTeam) {
+    case 1:
+      room.activeGame.team1PointsInRound += pointsGot;
+      room.activeGame.activePlayer = winningPlayer; 
+      room.activeGame.activePlayerIndex = getPlayerIndex(room, winningPlayer); 
+      break;
+    case 2:
+      room.activeGame.team2PointsInRound += pointsGot;
+      room.activeGame.activePlayer = winningPlayer; 
+      room.activeGame.activePlayerIndex = getPlayerIndex(room, winningPlayer);  
+      break;
+    default: 
+      console.log("No teams appeared to have scored that round");
+      break;
+  }
+
+  // Handles an edge case in which the game ends by every player going out 
+  if (room.activeGame.ledSuit === -1) {
+    room.activeGame.ledSuit = 999;
+  }
+
+  if (winningTeam === -1) {
+    room.roomStatus = `Round is over! There were no trump cards played...`;
+  }
+  else {
+    room.roomStatus = `${winningPlayer.displayName} won the hand! Their team got ${pointsGot} ${pointsGot === 1 ? 'point' : 'points'} that round.` 
+
+    // Is a chance that the player that won went out before the end of the round. Should account for this.
+    if (winningPlayer.cardCount <= 0) {
+      room.activeGame.activePlayerIndex = (++room.activeGame.activePlayerIndex % 4); 
+      room.activeGame.activePlayer = getNextPlayer(room); 
+      let i = 0; 
+      while (room.activeGame.activePlayer.cardCount <= 0 && i < 4) {
+        room.activeGame.activePlayerIndex = (++room.activeGame.activePlayerIndex % 4); 
+        room.activeGame.activePlayer = getNextPlayer(room);  
+        // Prevent infinite loops at the end of a round 
+        i++;
+      }
+    }
+  }
+
+  if (teamLaidTwo !== 0) {
+    room.roomStatus += ` Team ${teamLaidTwo} laid the two, so they get an extra point.`;
+  }
+
+  await room.activeGame.save();
+  await room.save();
+}
+
+function findDealer(room) {
   if (room.dealer < 0 || room.dealer > 3) {
     room.dealer = Math.floor(Math.random() * 4); 
   }
@@ -214,9 +440,28 @@ async function createNewGame(room) {
     }
     default: {
       console.log("Error: Room's last dealer is invalid: " + room.dealer); 
-      return null; 
+      return [-1, -1]; 
     }
   }
+
+  return [firstPlayer, firstPlayerIndex];
+}
+
+function deal(room) {
+  let deck = shuffleDeck(); 
+  
+  // Give 9 cards to each player, denotes their hands 
+  setPlayerHand(room.team1.player1._id, deck.splice(0,9));
+  setPlayerHand(room.team1.player2._id, deck.splice(0,9));
+  setPlayerHand(room.team2.player1._id, deck.splice(0,9));
+  setPlayerHand(room.team2.player2._id, deck.splice(0,9));
+
+  return deck; 
+}
+
+async function createNewGame(room) {
+  let deck = deal(room); 
+  let firstPlayer = findDealer(room); 
 
   let newGame = new Game({
     deck: deck,
@@ -226,10 +471,12 @@ async function createNewGame(room) {
     suit: -1,
     ledSuit: -1,
     suitName: '',
-    activePlayer: firstPlayer,
-    activePlayerIndex: firstPlayerIndex, 
+    activePlayer: firstPlayer[0],
+    activePlayerIndex: firstPlayer[1], 
     team1Score: 0, 
     team2Score: 0,
+    team1PointsInRound: 0, 
+    team2PointsInRound: 0,
     isActive: true,
     handsSet: false
   });
@@ -473,7 +720,7 @@ router.post('/goOut', async (req, res) => {
   player.cardCount = 0;
   await player.save(); 
 
-  let updatedRoom = await getRoomByActivePlayer(req.body['player']);
+  let updatedRoom = await getRoomByActivePlayer(req.body['activePlayer']);
 
   if (req.body['activePlayer'] === req.body['player']) {
     // Check if all players have played (that aren't out)
@@ -483,11 +730,7 @@ router.post('/goOut', async (req, res) => {
       (updatedRoom.team2.player1.playedCard !== -1 || updatedRoom.team2.player1.cardCount === 0) &&
       (updatedRoom.team2.player2.playedCard !== -1 || updatedRoom.team2.player2.cardCount === 0)
     ) {
-      // TODO Score hands
-      // Set scores for each team
-      // Set team down if they bid and lost 
-      // Set active player to player with highest card 
-      // Set led suit to -1 
+      await scoreHand(updatedRoom);
     }
     else {
       updatedRoom.activeGame.activePlayerIndex = (++updatedRoom.activeGame.activePlayerIndex % 4); 
@@ -502,9 +745,10 @@ router.post('/goOut', async (req, res) => {
 
     await updatedRoom.activeGame.save();
   }
+  else {
+    updatedRoom.roomStatus = `${player.displayName} has gone out. ${updatedRoom.activeGame.activePlayer.displayName} is still up.`;
+  }
 
-  updatedRoom.roomStatus = `${player.displayName} has gone out. ${updatedRoom.activeGame.activePlayer.displayName} is still up.`;
-  
   await updatedRoom.save(); 
 
   req.app.io.to(room.short_id).emit('room-update', (updatedRoom));
@@ -542,8 +786,20 @@ router.post('/playCard', async (req, res) => {
     return;
   }
 
-  // Check if the ledSuit has been set yet
   let requestedSuit = Math.floor((req.body['card'] - 1)/ 13);
+  if (requestedSuit !== room.activeGame.suit) {
+    // Account for special situations that can occur
+    if (req.body['card'] > 52) {
+      // Account for jokers
+      requestedSuit = room.activeGame.suit;
+    }
+    else {
+      // Account for off jacks
+      let offJacks = [49, 36, 23, 10];
+      requestedSuit = (offJacks.indexOf(req.body['card']) >= 0 ? offJacks.indexOf(req.body['card']) : Math.floor((req.body['card'] - 1)/ 13));
+    }
+  }
+  // Check if the ledSuit has been set yet
   if (room.activeGame.ledSuit === -1) {
     // Set ledSuit to the suit of the card played
     room.activeGame.ledSuit = requestedSuit;
@@ -552,8 +808,7 @@ router.post('/playCard', async (req, res) => {
   else if (
       room.activeGame.ledSuit === room.activeGame.suit && 
       requestedSuit < 4 &&
-      requestedSuit !== room.activeGame.suit && 
-      getOffJack(room.activeGame.ledSuit) !== req.body['card']) {
+      requestedSuit !== room.activeGame.suit) {
     res.json({
       "status": "invalidSuit",
       "details": `The on suit was led. You must bet in ${room.activeGame.suitName}`
@@ -575,11 +830,7 @@ router.post('/playCard', async (req, res) => {
     (updatedRoom.team2.player1.playedCard !== -1 || updatedRoom.team2.player1.cardCount === 0) &&
     (updatedRoom.team2.player2.playedCard !== -1 || updatedRoom.team2.player2.cardCount === 0)
   ) {
-    // TODO Score hands
-    // Set scores for each team
-    // Set team down if they bid and lost 
-    // Set active player to player with highest card 
-    // Set led suit to -1 
+    await scoreHand(updatedRoom);
   }
   else {
     updatedRoom.activeGame.activePlayerIndex = (++updatedRoom.activeGame.activePlayerIndex % 4); 
@@ -596,6 +847,26 @@ router.post('/playCard', async (req, res) => {
   await updatedRoom.save(); 
 
   req.app.io.to(room.short_id).emit('room-update', (updatedRoom));
+
+  res.json({
+    "status": "success"
+  });
+});
+
+router.post('/advanceRound', async (req, res) => {
+  let room = await getRoomByActivePlayer(req.body['activePlayer']);
+  if (!room || room.activeGame.ledSuit === -1) {
+    res.json({
+      "status": "error",
+      "details": "Invalid room details. Wrong active player or not ready to advance"
+    });
+    return; 
+  }
+
+  let updatedRoom = await advanceRound(room);
+  let updatedRoomPopulated = await getRoomByActivePlayer(updatedRoom.activeGame.activePlayer._id);
+
+  req.app.io.to(room.short_id).emit('room-update', (updatedRoomPopulated));
 
   res.json({
     "status": "success"

@@ -9,9 +9,6 @@ const GameAPI = require('./game');
 const Room = require('../../model/Room');
 const Team = require('../../model/Team');
 const Player = require('../../model/Player');
-const User = require('../../model/User');
-const Utils = require('../../utility.js');
-const auth = require('../../auth.json'); 
 
 async function getRoom(roomId) {
   return await Room.findOne({ short_id: roomId.toUpperCase() }).exec();
@@ -30,7 +27,7 @@ async function getRoomPopulated(roomId) {
         { path: 'player2', select: 'displayName isReady cardCount playedCard' }
       ]})
     .populate({ 
-      path: 'activeGame', select: 'bid suit suitName biddingPlayer activePlayer activePlayerIndex team1Score team2Score', 
+      path: 'activeGame', select: 'bid suit suitName biddingPlayer activePlayer activePlayerIndex team1Score team2Score team1PointsInRound team2PointsInRound', 
         populate: [
           { path: 'activePlayer', select: 'displayName isReady cardCount' },
           { path: 'biddingPlayer', select: 'displayName isReady cardCount' }
@@ -50,7 +47,8 @@ async function startRoom(roomId) {
 
   let activePlayer = await Player.getPlayerNoCards(game.activePlayer);
   room.roomStatus = `New game has begun! ${activePlayer.displayName} starts the bidding.`;
-  return room.save();
+  await room.save();
+  return room;
 }
 
 router.post('/', async (req, res) => {
@@ -110,7 +108,7 @@ router.post('/', async (req, res) => {
 router.get('/:roomId', async (req, res) => {
   const roomId = req.params['roomId'].toUpperCase();
   let room = await getRoomPopulated(roomId);
-  if (room == undefined) {
+  if (!room) {
     res.json({
       "status": "error",
       "details": "Unable to find requested room"
@@ -122,6 +120,24 @@ router.get('/:roomId', async (req, res) => {
       "room": room 
     })
   }
+});
+
+router.post('/newGame', async (req, res) => {
+  let room = await startRoom(req.body['room']);
+  if (!room) {
+    res.json({
+      "status": "error",
+      "details": "Unable to find requested room"
+    });
+  }
+
+  let updatedRoom = await getRoomPopulated(room.short_id)
+
+  req.app.io.to(updatedRoom.short_id).emit('room-update', (updatedRoom));
+
+  res.json({
+    "status": "success"
+  });
 });
 
 module.exports = router;
