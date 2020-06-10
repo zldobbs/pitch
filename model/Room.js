@@ -17,6 +17,7 @@ const RoomSchema = mongoose.Schema({
     }],
     team1: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
     team2: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
+    pendingRequest: Number
 });
 
 const Room = module.exports = mongoose.model('Room', RoomSchema);

@@ -606,19 +606,27 @@ router.post('/passBid', async (req, res) => {
 });
 
 router.post('/setSuit', async (req, res) => {
-  // TODO Set up some sort of safe-check to avoid running this twice 
-  // Problems happen whenever the user sends the same request more than once
-  // - This issue could happen when laying a card as well
-  // -- Maybe find a better way to lay cards too
-  // Should set up some sort of caching measure
   let room = await getRoomByActivePlayer(req.body['player']);
-  if (!room) {
+  if (!room || room.pendingRequest == 1) {
     res.json({
       "status": "error",
       "details": "Error: User is not active in any known game"
     });
     return;
   }
+
+  if (room.pendingRequest === 1) {
+    console.log('Blocked request to setSuit due to pendingRequest');
+    res.json({
+      "status": "error",
+      "details": "There is already a pending request"
+    });
+    return;
+  }
+
+  // TODO All these saves is definitely not efficient...
+  room.pendingRequest = 1; 
+  await room.save(); 
 
   switch (req.body['suit']) {
     case 0: {
@@ -659,11 +667,15 @@ router.post('/setSuit', async (req, res) => {
 
   room.roomStatus = `${room.activeGame.activePlayer.displayName} set the suit to ${room.activeGame.suitName}! Hands have been updated. Wait for players to discard extra cards.`;
 
+  room.pendingRequest = 0; 
+
   await room.activeGame.activePlayer.save();
   await room.save();
 
   const updatedRoom = await getRoomByActivePlayer(req.body['player']);
   req.app.io.to(room.short_id).emit('room-update', (updatedRoom));
+
+
 
   res.json({
     "status": "success"
@@ -770,7 +782,7 @@ router.post('/playCard', async (req, res) => {
   if (!room) {
     res.json({
       "status": "error",
-      "details": "Error: User is not active in any known game"
+      "details": "You are not up to play"
     });
     return;
   }
@@ -779,7 +791,15 @@ router.post('/playCard', async (req, res) => {
   if (player.hand.length > 6) {
     res.json({
       "status": "error",
-      "details": "Error: User has more than 6 cards"
+      "details": "You have more than 6 cards. Something went wrong!"
+    });
+    return;
+  }
+
+  if (player.playedCard > 0) {
+    res.json({
+      "status": "error",
+      "details": "You have already played a card this round"
     });
     return;
   }
@@ -788,7 +808,7 @@ router.post('/playCard', async (req, res) => {
   if (cardIndex < 0) {
     res.json({
       "status": "error",
-      "details": "Error: User does not have the card played"
+      "details": "You don't have that card"
     });
     return;
   }

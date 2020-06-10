@@ -89,7 +89,8 @@ router.post('/', async (req, res) => {
     messages: [],
     team1: newTeams[0],
     team2: newTeams[1],
-    activeGame: null
+    activeGame: null,
+    pendingRequest: 0 
   });
   newRoom.save().then(item => {
     res.json({
