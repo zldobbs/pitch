@@ -2,9 +2,8 @@ const mongoose = require('mongoose');
 const auth = require("../auth.json");
 
 mongoose.connect(
-    process.env.MONGODB_URI || 
-    'mongodb://' + auth.db.ipaddr + ':' + auth.db.port + '/pitch',
-    { user: auth.db.user, pass: auth.db.pass }
+  'mongodb://' + auth.db.ipaddr + ':' + auth.db.port + '/pitch-db',
+  { user: auth.db.username, pass: auth.db.password }
 );
 /*
 this connection should be available to all other

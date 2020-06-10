@@ -7,7 +7,7 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const app = express();
 const server = require('http').Server(app);
-const io = require('socket.io')(server, { origins: `${auth.client.ipaddr}:${auth.client.port}` });
+const io = require('socket.io').listen(server);
 
 app.use(cors());
 app.options('*', cors());

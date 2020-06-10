@@ -482,7 +482,9 @@ async function createNewGame(room) {
   });
 
   await room.save(); 
-  return newGame.save();
+  await newGame.save();
+
+  return newGame; 
 }
 
 router.post('/hand', async (req, res) => {
@@ -604,6 +606,11 @@ router.post('/passBid', async (req, res) => {
 });
 
 router.post('/setSuit', async (req, res) => {
+  // TODO Set up some sort of safe-check to avoid running this twice 
+  // Problems happen whenever the user sends the same request more than once
+  // - This issue could happen when laying a card as well
+  // -- Maybe find a better way to lay cards too
+  // Should set up some sort of caching measure
   let room = await getRoomByActivePlayer(req.body['player']);
   if (!room) {
     res.json({
