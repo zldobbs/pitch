@@ -607,26 +607,13 @@ router.post('/passBid', async (req, res) => {
 
 router.post('/setSuit', async (req, res) => {
   let room = await getRoomByActivePlayer(req.body['player']);
-  if (!room || room.pendingRequest == 1) {
+  if (!room) {
     res.json({
       "status": "error",
       "details": "Error: User is not active in any known game"
     });
     return;
   }
-
-  if (room.pendingRequest === 1) {
-    console.log('Blocked request to setSuit due to pendingRequest');
-    res.json({
-      "status": "error",
-      "details": "There is already a pending request"
-    });
-    return;
-  }
-
-  // TODO All these saves is definitely not efficient...
-  room.pendingRequest = 1; 
-  await room.save(); 
 
   switch (req.body['suit']) {
     case 0: {
@@ -666,8 +653,6 @@ router.post('/setSuit', async (req, res) => {
   await updateHandWithDeck(room.activeGame.activePlayer._id, room._id); 
 
   room.roomStatus = `${room.activeGame.activePlayer.displayName} set the suit to ${room.activeGame.suitName}! Hands have been updated. Wait for players to discard extra cards.`;
-
-  room.pendingRequest = 0; 
 
   await room.activeGame.activePlayer.save();
   await room.save();
