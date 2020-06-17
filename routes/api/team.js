@@ -84,7 +84,8 @@ router.post('/join', async (req, res) => {
     if (updatedTeam !== null) {
         // Get the updatedTeam
         const updatedRoom = await Room.findOne({ $or: [{ team1: updatedTeam._id}, { team2: updatedTeam._id}] }).populate({ path: 'team1', populate: [{ path: 'player1', select: 'displayName isReady cardCount' }, { path: 'player2', select: 'displayName isReady cardCount' }]})
-        .populate({ path: 'team2', populate: [{ path: 'player1' }, { path: 'player2' }]});
+        .populate({ path: 'team2', populate: [{ path: 'player1' }, { path: 'player2' }]})
+        .populate({ path: 'messages', populate: { path: 'player', select: 'displayName' }});
         // Need to emit the updated team information to the room 
         req.app.io.to(updatedRoom.short_id).emit('room-update', (updatedRoom));
     }
@@ -128,7 +129,8 @@ router.post('/join', async (req, res) => {
 
   // Get the updatedTeam
   const updatedRoom = await Room.findOne({ $or: [{ team1: team._id}, { team2: team._id}] }).populate({ path: 'team1', populate: [{ path: 'player1', select: 'displayName isReady cardCount' }, { path: 'player2', select: 'displayName isReady cardCount' }]})
-  .populate({ path: 'team2', populate: [{ path: 'player1' }, { path: 'player2' }]});
+  .populate({ path: 'team2', populate: [{ path: 'player1' }, { path: 'player2' }]})
+  .populate({ path: 'messages', populate: { path: 'player', select: 'displayName' }});
   // Need to emit the updated team information to the room 
   req.app.io.to(updatedRoom.short_id).emit('room-update', (updatedRoom));
 
@@ -144,7 +146,8 @@ router.post('/leave', async (req, res) => {
     if (updatedTeam !== null) {
         // Get the updatedTeam
         const updatedRoom = await Room.findOne({ $or: [{ team1: updatedTeam._id}, { team2: updatedTeam._id}] }).populate({ path: 'team1', populate: [{ path: 'player1', select: 'displayName isReady cardCount' }, { path: 'player2', select: 'displayName isReady cardCount' }]})
-        .populate({ path: 'team2', populate: [{ path: 'player1' }, { path: 'player2' }]});
+        .populate({ path: 'team2', populate: [{ path: 'player1' }, { path: 'player2' }]})
+        .populate({ path: 'messages', populate: { path: 'player', select: 'displayName' }});
         // Need to emit the updated team information to the room 
         req.app.io.to(updatedRoom.short_id).emit('room-update', (updatedRoom));
     }
