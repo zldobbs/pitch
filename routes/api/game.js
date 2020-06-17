@@ -37,6 +37,9 @@ async function getRoomByActivePlayer(playerId) {
         { path: 'player1', select: 'displayName isReady cardCount playedCard' }, 
         { path: 'player2', select: 'displayName isReady cardCount playedCard' }
       ]})
+    .populate({ path: 'messages', 
+      populate: { path: 'player', select: 'displayName' }
+    })
     .populate({ 
       path: 'activeGame', select: 'bid suit ledSuit suitName biddingPlayer activePlayer activePlayerIndex team1Score team2Score team1PointsInRound team2PointsInRound', 
         populate: [

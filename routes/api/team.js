@@ -20,8 +20,6 @@ async function removePlayerFromTeam(playerId) {
   let team = await Team.findOne({ $or: [{player1: playerId}, {player2: playerId}] });
   let query; 
   if (team) {
-    // delete player
-    await Player.deleteOne({ _id: playerId });
     if (team.player1 && team.player1.toString() === playerId) {
       query = { player1: null };
     }

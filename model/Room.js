@@ -11,12 +11,9 @@ const RoomSchema = mongoose.Schema({
     dealer: Number,
     activeGame: { type: mongoose.Schema.Types.ObjectId, ref: 'Game' },
     games: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Game' }],
-    messages: [{
-        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-        message: String
-    }],
     team1: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
-    team2: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' }
+    team2: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
+    messages: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Chat' }]
 });
 
 const Room = module.exports = mongoose.model('Room', RoomSchema);
