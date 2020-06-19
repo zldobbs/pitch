@@ -21,10 +21,10 @@ async function removePlayerFromTeam(playerId) {
   let query; 
   if (team) {
     if (team.player1 && team.player1.toString() === playerId) {
-      query = { player1: null };
+      query = { player1: undefined };
     }
     if (team.player2 && team.player2.toString() === playerId) {
-      query = { player2: null };
+      query = { player2: undefined };
     }
     await Team.updateOne(
       { _id: team._id }, 

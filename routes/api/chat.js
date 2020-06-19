@@ -69,6 +69,8 @@ router.post('/', async (req, res) => {
   let updatedRoom = await getRoomPopulated(req.body['roomId']);
 
   req.app.io.to(updatedRoom.short_id).emit('room-update', (updatedRoom));
+  console.log('Sending new message');
+  req.app.io.to(updatedRoom.short_id).emit('new-message', (newMessage));
 
   res.json({
     "status": "success"
