@@ -13,9 +13,26 @@ async function getPlayer(playerId) {
 }
 
 async function getRoomPopulated(roomId) {
-  return await Room.findOne({ _id: roomId })
-    .populate({ path: 'team1', populate: [{ path: 'player1', select: 'displayName isReady cardCount' }, { path: 'player2', select: 'displayName isReady cardCount' }]})
-    .populate({ path: 'team2', populate: [{ path: 'player1' }, { path: 'player2' }]});
+  return await Room.findOne({ short_id: roomId.toUpperCase() })
+    .populate({ path: 'team1', 
+      populate: [
+        { path: 'player1', select: 'displayName isReady cardCount playedCard' }, 
+        { path: 'player2', select: 'displayName isReady cardCount playedCard' }
+      ]})
+    .populate({ path: 'team2', 
+      populate: [
+        { path: 'player1', select: 'displayName isReady cardCount playedCard' }, 
+        { path: 'player2', select: 'displayName isReady cardCount playedCard' }
+      ]})
+    .populate({ path: 'messages', 
+      populate: { path: 'player', select: 'displayName' }
+    })
+    .populate({ 
+      path: 'activeGame', select: 'bid suit suitName biddingPlayer activePlayer activePlayerIndex team1Score team2Score team1PointsInRound team2PointsInRound', 
+        populate: [
+          { path: 'activePlayer', select: 'displayName isReady cardCount' },
+          { path: 'biddingPlayer', select: 'displayName isReady cardCount' }
+        ]});
 }
 
 router.get('/:playerId', async (req, res) => {
@@ -58,6 +75,36 @@ router.post('/ready', async (req, res) => {
   res.json({
     "status": "success",
     "player": player
+  });
+});
+
+router.post('/changeName', async (req, res) => {
+  let player = await getPlayer(req.body['player']);
+  if (!player) {
+    res.json({
+      "status": "error",
+      "details": "Error: Player does not exist"
+    });
+    return; 
+  }
+
+  player.displayName = req.body['name'];
+  await player.save(); 
+
+  const updatedRoom = await getRoomPopulated(req.body['room']);
+  if (!updatedRoom) {
+    res.json({
+      "status": "Error",
+      "details": "Player is not in a room"
+    });
+    return; 
+  }
+
+  req.app.io.to(updatedRoom.short_id).emit('room-update', updatedRoom);
+
+  res.json({
+    "status": "success",
+    "details": "Updated player name"
   });
 });
 
