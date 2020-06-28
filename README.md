@@ -1,8 +1,8 @@
-# Pitch
+# Pitch ![Pitch Image](https://github.com/zldobbs/pitch-client/blob/66ad47dd830841beb1d8812cb369307d46a02446/src/assets/img/cards/preview_image.png?raw=true)
 
-A MERN stack impelmentation of the [Pitch card game.](https://en.wikipedia.org/wiki/Pitch_%28card_game%29) The version implemented here is a 2-team, 4-player, 5-10 bid game played to 31. 
+A MERN stack impelmentation of the [Pitch card game.](https://en.wikipedia.org/wiki/Pitch_%28card_game%29) The version implemented here is a 2-team, 4-player, 5-10 bid game played to 31 (see Campbell Ten-Point Pitch on the above Wikipedia page). 
 
-The game itself is hosted on Heroku. It is free-to-play [here.](http://www.dobbs-pitch.herokuapp.com)
+The game itself is hosted on Heroku. It is free-to-play [here.](https://dobbs-pitch.herokuapp.com/)
 
 This application was developed using the MERN stack (MongoDB, Express, React, and Node). [Materialize](https://materializecss.com/) was used for the frontend CSS framework. [socket-io](https://socket.io/) was used to manage websockets and [axios](https://github.com/axios/axios) was used for the HTTP client. 
 
