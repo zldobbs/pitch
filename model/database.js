@@ -5,7 +5,7 @@ mongoose.connect(
   auth.db.connectStr,
   {
     user: auth.db.username,
-    password: auth.db.password,
+    pass: auth.db.password,
     useNewUrlParser: true, 
     useUnifiedTopology: true,
     useCreateIndex: true
