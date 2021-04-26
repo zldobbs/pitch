@@ -2,8 +2,14 @@ const mongoose = require('mongoose');
 const auth = require("../auth.json");
 
 mongoose.connect(
-  'mongodb://' + auth.db.ipaddr + ':' + auth.db.port + '/pitch-db',
-  { user: auth.db.username, pass: auth.db.password }
+  auth.db.connectStr,
+  {
+    user: auth.db.username,
+    password: auth.db.password,
+    useNewUrlParser: true, 
+    useUnifiedTopology: true,
+    useCreateIndex: true
+  }
 );
 /*
 this connection should be available to all other
@@ -21,5 +27,5 @@ process.on('SIGINT', function() {
 let db = mongoose.connection;
 db.on('error', console.error.bind(console, 'connection error:'));
 db.once('open', function() {
-    console.log('Connected to database: ' + auth.db.ipaddr);
+    console.log('Connected to database: ' + auth.db.connectStr);
 }); 

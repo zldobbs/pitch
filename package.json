@@ -11,7 +11,7 @@
   "author": "Zach Dobbs",
   "license": "ISC",
   "devDependencies": {
-    "nodemon": "^2.0.2"
+    "nodemon": "^2.0.7"
   },
   "dependencies": {
     "body-parser": "^1.19.0",
@@ -19,8 +19,8 @@
     "crypto": "^1.0.1",
     "express": "^4.17.1",
     "http": "0.0.1-security",
-    "mongoose": "^5.9.7",
-    "shortid": "^2.2.15",
-    "socket.io": "^2.3.0"
+    "mongoose": "^5.12.5",
+    "shortid": "^2.2.16",
+    "socket.io": "^2.4.1"
   }
 }
